@@ -1,1 +1,13 @@
 project_id = "brukpbahpxhnsjnywywp"
+
+[functions.initiate-call]
+verify_jwt = true
+
+[functions.twilio-webhook]
+verify_jwt = false
+
+[functions.save-call-response]
+verify_jwt = false
+
+[functions.process-batch]
+verify_jwt = true

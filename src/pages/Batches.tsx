@@ -125,6 +125,24 @@ export default function Batches() {
     },
   });
 
+  const startBatchMutation = useMutation({
+    mutationFn: async (batchId: string) => {
+      const { data, error } = await supabase.functions.invoke('process-batch', {
+        body: { batchId },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_, batchId) => {
+      queryClient.invalidateQueries({ queryKey: ['batches'] });
+      logAction('start_calls', 'batch', batchId);
+      toast({ title: 'Batch calls started', description: 'Calls are being initiated in the background.' });
+    },
+    onError: (error: Error) => {
+      toast({ variant: 'destructive', title: 'Failed to start batch calls', description: error.message });
+    },
+  });
+
   const updateBatchStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const { error } = await supabase
@@ -137,7 +155,7 @@ export default function Batches() {
     onSuccess: ({ id, status }) => {
       queryClient.invalidateQueries({ queryKey: ['batches'] });
       logAction('update_status', 'batch', id, { status });
-      toast({ title: `Batch ${status === 'cancelled' ? 'cancelled' : 'started'}` });
+      toast({ title: `Batch ${status === 'cancelled' ? 'cancelled' : 'updated'}` });
     },
     onError: (error: Error) => {
       toast({ variant: 'destructive', title: 'Failed to update batch', description: error.message });
@@ -336,7 +354,9 @@ export default function Batches() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => updateBatchStatusMutation.mutate({ id: batch.id, status: 'in_progress' })}
+                            onClick={() => startBatchMutation.mutate(batch.id)}
+                            disabled={startBatchMutation.isPending}
+                            title="Start calls"
                           >
                             <Play className="h-4 w-4 text-success" />
                           </Button>
