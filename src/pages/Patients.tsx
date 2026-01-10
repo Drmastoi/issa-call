@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Upload, Search, Trash2, Edit, FileSpreadsheet, Phone, Loader2 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
+import { CallStatusMonitor } from '@/components/CallStatusMonitor';
 
 interface Patient {
   id: string;
@@ -29,6 +30,8 @@ export default function Patients() {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
   const [callingPatientId, setCallingPatientId] = useState<string | null>(null);
+  const [activeCallId, setActiveCallId] = useState<string | null>(null);
+  const [activeCallPatientName, setActiveCallPatientName] = useState<string | undefined>(undefined);
   const { user } = useAuth();
   const { logAction } = useAuditLog();
   const { toast } = useToast();
@@ -114,6 +117,7 @@ export default function Patients() {
   const testCallMutation = useMutation({
     mutationFn: async (patient: Patient) => {
       setCallingPatientId(patient.id);
+      setActiveCallPatientName(patient.name);
       
       // First create a call record
       const { data: callData, error: callError } = await supabase
@@ -127,6 +131,9 @@ export default function Patients() {
         .single();
       
       if (callError) throw callError;
+
+      // Set active call ID to show monitor
+      setActiveCallId(callData.id);
 
       // Then initiate the call
       const { data, error } = await supabase.functions.invoke('initiate-call', {
@@ -146,13 +153,15 @@ export default function Patients() {
       logAction('test_call', 'call', callingPatientId ?? undefined);
       toast({ 
         title: 'Call initiated', 
-        description: 'The test call has been started. Check the Calls page for status.' 
+        description: 'The call is now in progress.' 
       });
       setCallingPatientId(null);
     },
     onError: (error: Error) => {
       toast({ variant: 'destructive', title: 'Failed to initiate call', description: error.message });
       setCallingPatientId(null);
+      setActiveCallId(null);
+      setActiveCallPatientName(undefined);
     },
   });
 
@@ -257,6 +266,15 @@ export default function Patients() {
   };
 
   return (
+    <>
+    <CallStatusMonitor
+      callId={activeCallId}
+      patientName={activeCallPatientName}
+      onClose={() => {
+        setActiveCallId(null);
+        setActiveCallPatientName(undefined);
+      }}
+    />
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -495,5 +513,6 @@ Jane Doe,07700900456,,Afternoon`}
         </DialogContent>
       </Dialog>
     </div>
+    </>
   );
 }
