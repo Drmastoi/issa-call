@@ -12,6 +12,7 @@ import Batches from "./pages/Batches";
 import Calls from "./pages/Calls";
 import Export from "./pages/Export";
 import Settings from "./pages/Settings";
+import QOFReports from "./pages/QOFReports";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,6 +34,7 @@ const App = () => (
               <Route path="/calls" element={<Calls />} />
               <Route path="/export" element={<Export />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/qof-reports" element={<QOFReports />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
