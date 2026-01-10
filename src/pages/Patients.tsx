@@ -10,9 +10,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Upload, Search, Trash2, Edit, FileSpreadsheet, Phone, Loader2 } from 'lucide-react';
+import { Plus, Upload, Search, Trash2, Edit, FileSpreadsheet, Phone, Loader2, Activity } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { CallStatusMonitor } from '@/components/CallStatusMonitor';
+import { HealthMetricsSummary } from '@/components/HealthMetricsSummary';
 
 interface Patient {
   id: string;
@@ -32,6 +33,7 @@ export default function Patients() {
   const [callingPatientId, setCallingPatientId] = useState<string | null>(null);
   const [activeCallId, setActiveCallId] = useState<string | null>(null);
   const [activeCallPatientName, setActiveCallPatientName] = useState<string | undefined>(undefined);
+  const [metricsPatient, setMetricsPatient] = useState<Patient | null>(null);
   const { user } = useAuth();
   const { logAction } = useAuditLog();
   const { toast } = useToast();
@@ -275,6 +277,14 @@ export default function Patients() {
         setActiveCallPatientName(undefined);
       }}
     />
+    {metricsPatient && (
+      <HealthMetricsSummary
+        patientId={metricsPatient.id}
+        patientName={metricsPatient.name}
+        isOpen={!!metricsPatient}
+        onClose={() => setMetricsPatient(null)}
+      />
+    )}
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -429,6 +439,14 @@ Jane Doe,07700900456,,Afternoon`}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setMetricsPatient(patient)}
+                          title="View health metrics"
+                        >
+                          <Activity className="h-4 w-4 text-green-600" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
