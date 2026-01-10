@@ -14,7 +14,17 @@ serve(async (req) => {
   try {
     const { callId, patientId, patientName, phoneNumber } = await req.json();
     
-    console.log("Initiating call:", { callId, patientId, patientName, phoneNumber });
+    // Convert UK phone numbers to E.164 format
+    let formattedPhone = phoneNumber;
+    if (phoneNumber.startsWith('0') && !phoneNumber.startsWith('+')) {
+      // UK number starting with 0 - convert to +44
+      formattedPhone = '+44' + phoneNumber.substring(1);
+    } else if (!phoneNumber.startsWith('+')) {
+      // Add + if missing
+      formattedPhone = '+' + phoneNumber;
+    }
+    
+    console.log("Initiating call:", { callId, patientId, patientName, phoneNumber, formattedPhone });
 
     const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID");
     const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN");
@@ -76,7 +86,7 @@ serve(async (req) => {
     const twilioAuth = btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`);
     
     const formData = new URLSearchParams();
-    formData.append("To", phoneNumber);
+    formData.append("To", formattedPhone);
     formData.append("From", TWILIO_PHONE_NUMBER);
     formData.append("Twiml", twiml);
     formData.append("StatusCallback", webhookUrl);
