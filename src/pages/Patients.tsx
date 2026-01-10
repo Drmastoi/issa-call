@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Upload, Search, Trash2, Edit, FileSpreadsheet } from 'lucide-react';
+import { Plus, Upload, Search, Trash2, Edit, FileSpreadsheet, Phone, Loader2 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 
 interface Patient {
@@ -28,6 +28,7 @@ export default function Patients() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
+  const [callingPatientId, setCallingPatientId] = useState<string | null>(null);
   const { user } = useAuth();
   const { logAction } = useAuditLog();
   const { toast } = useToast();
@@ -107,6 +108,51 @@ export default function Patients() {
     },
     onError: (error: Error) => {
       toast({ variant: 'destructive', title: 'Failed to delete patient', description: error.message });
+    },
+  });
+
+  const testCallMutation = useMutation({
+    mutationFn: async (patient: Patient) => {
+      setCallingPatientId(patient.id);
+      
+      // First create a call record
+      const { data: callData, error: callError } = await supabase
+        .from('calls')
+        .insert({
+          patient_id: patient.id,
+          status: 'pending',
+          attempt_number: 1,
+        })
+        .select()
+        .single();
+      
+      if (callError) throw callError;
+
+      // Then initiate the call
+      const { data, error } = await supabase.functions.invoke('initiate-call', {
+        body: {
+          callId: callData.id,
+          patientId: patient.id,
+          patientName: patient.name,
+          phoneNumber: patient.phone_number,
+        },
+      });
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['calls'] });
+      logAction('test_call', 'call', callingPatientId ?? undefined);
+      toast({ 
+        title: 'Call initiated', 
+        description: 'The test call has been started. Check the Calls page for status.' 
+      });
+      setCallingPatientId(null);
+    },
+    onError: (error: Error) => {
+      toast({ variant: 'destructive', title: 'Failed to initiate call', description: error.message });
+      setCallingPatientId(null);
     },
   });
 
@@ -364,11 +410,25 @@ Jane Doe,07700900456,,Afternoon`}
                       {new Date(patient.created_at).toLocaleDateString('en-GB')}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => testCallMutation.mutate(patient)}
+                          disabled={callingPatientId === patient.id}
+                          title="Test call"
+                        >
+                          {callingPatientId === patient.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Phone className="h-4 w-4 text-primary" />
+                          )}
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => setEditingPatient(patient)}
+                          title="Edit patient"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -376,6 +436,7 @@ Jane Doe,07700900456,,Afternoon`}
                           variant="ghost"
                           size="icon"
                           onClick={() => deletePatientMutation.mutate(patient.id)}
+                          title="Delete patient"
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
