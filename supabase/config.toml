@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.elevenlabs-webhook]
 verify_jwt = false
+
+[functions.ai-health-analysis]
+verify_jwt = false

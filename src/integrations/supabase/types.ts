@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_summaries: {
+        Row: {
+          action_items: Json | null
+          call_id: string
+          clinical_summary: string
+          created_at: string
+          id: string
+          key_findings: Json | null
+          patient_id: string
+          qof_relevance: Json | null
+        }
+        Insert: {
+          action_items?: Json | null
+          call_id: string
+          clinical_summary: string
+          created_at?: string
+          id?: string
+          key_findings?: Json | null
+          patient_id: string
+          qof_relevance?: Json | null
+        }
+        Update: {
+          action_items?: Json | null
+          call_id?: string
+          clinical_summary?: string
+          created_at?: string
+          id?: string
+          key_findings?: Json | null
+          patient_id?: string
+          qof_relevance?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_summaries_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: false
+            referencedRelation: "calls"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_summaries_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -238,6 +286,77 @@ export type Database = {
           },
           {
             foreignKeyName: "calls_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      emis_read_codes: {
+        Row: {
+          description: string
+          id: string
+          metric_type: string
+          read_code: string
+          snomed_code: string | null
+        }
+        Insert: {
+          description: string
+          id?: string
+          metric_type: string
+          read_code: string
+          snomed_code?: string | null
+        }
+        Update: {
+          description?: string
+          id?: string
+          metric_type?: string
+          read_code?: string
+          snomed_code?: string | null
+        }
+        Relationships: []
+      }
+      health_alerts: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          alert_type: string
+          created_at: string
+          description: string
+          id: string
+          metrics: Json | null
+          patient_id: string
+          severity: string
+          title: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          alert_type: string
+          created_at?: string
+          description: string
+          id?: string
+          metrics?: Json | null
+          patient_id: string
+          severity: string
+          title: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          alert_type?: string
+          created_at?: string
+          description?: string
+          id?: string
+          metrics?: Json | null
+          patient_id?: string
+          severity?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "health_alerts_patient_id_fkey"
             columns: ["patient_id"]
             isOneToOne: false
             referencedRelation: "patients"

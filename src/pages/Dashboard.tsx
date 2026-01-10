@@ -4,6 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Users, Phone, Calendar, CheckCircle, XCircle, Clock, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { AIInsightsPanel } from '@/components/dashboard/AIInsightsPanel';
+import { RiskAlertsWidget } from '@/components/dashboard/RiskAlertsWidget';
+import { QOFProgressPanel } from '@/components/dashboard/QOFProgressPanel';
 
 export default function Dashboard() {
   const { data: stats } = useQuery({
@@ -130,6 +133,23 @@ export default function Dashboard() {
         </Card>
       </div>
 
+      {/* Main Grid: AI Insights + Activity */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        {/* Left Column: AI Insights */}
+        <div className="lg:col-span-1 space-y-6">
+          <AIInsightsPanel />
+        </div>
+
+        {/* Right Column: Risk Alerts + QOF */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <RiskAlertsWidget maxItems={4} />
+            <QOFProgressPanel />
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Activity Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Calls */}
         <Card>
