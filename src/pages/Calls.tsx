@@ -1,12 +1,15 @@
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuditLog } from '@/hooks/useAuditLog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { CheckCircle, XCircle, Clock, Phone, PhoneOff, Eye } from 'lucide-react';
-import { useState } from 'react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { CheckCircle, XCircle, Clock, Phone, PhoneOff, Eye, Trash2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface Call {
   id: string;
@@ -41,6 +44,10 @@ interface CallResponse {
 
 export default function Calls() {
   const [viewCallId, setViewCallId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const { toast } = useToast();
+  const { logAction } = useAuditLog();
+  const queryClient = useQueryClient();
 
   const { data: calls, isLoading } = useQuery({
     queryKey: ['calls'],
@@ -79,12 +86,40 @@ export default function Calls() {
     },
   });
 
+  const deleteCallMutation = useMutation({
+    mutationFn: async (id: string) => {
+      // First delete any associated call_responses
+      const { error: responseError } = await supabase
+        .from('call_responses')
+        .delete()
+        .eq('call_id', id);
+      if (responseError) throw responseError;
+
+      const { error } = await supabase
+        .from('calls')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      return id;
+    },
+    onSuccess: (id) => {
+      queryClient.invalidateQueries({ queryKey: ['calls'] });
+      logAction('delete', 'call', id);
+      toast({ title: 'Call deleted successfully' });
+      setDeleteConfirmId(null);
+    },
+    onError: (error: Error) => {
+      toast({ variant: 'destructive', title: 'Failed to delete call', description: error.message });
+    },
+  });
+
   const viewingCall = calls?.find(c => c.id === viewCallId);
+  const deletingCall = calls?.find(c => c.id === deleteConfirmId);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'completed':
-        return <CheckCircle className="h-4 w-4 text-success" />;
+        return <CheckCircle className="h-4 w-4 text-green-600" />;
       case 'failed':
         return <XCircle className="h-4 w-4 text-destructive" />;
       case 'no_answer':
@@ -92,7 +127,7 @@ export default function Calls() {
       case 'in_progress':
         return <Phone className="h-4 w-4 text-primary animate-pulse" />;
       default:
-        return <Clock className="h-4 w-4 text-warning" />;
+        return <Clock className="h-4 w-4 text-orange-500" />;
     }
   };
 
@@ -195,13 +230,24 @@ export default function Calls() {
                       })}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setViewCallId(call.id)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setViewCallId(call.id)}
+                          title="View call details"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setDeleteConfirmId(call.id)}
+                          title="Delete call"
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -334,6 +380,27 @@ export default function Calls() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Call Record</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the call to "{deletingCall?.patients.name}"? This will also delete any associated health data. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteConfirmId && deleteCallMutation.mutate(deleteConfirmId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteCallMutation.isPending ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
