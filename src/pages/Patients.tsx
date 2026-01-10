@@ -167,7 +167,7 @@ export default function Patients() {
       
       // Skip header row
       const dataLines = lines.slice(1);
-      const patients: Partial<Patient>[] = [];
+      const patients: { name: string; phone_number: string; nhs_number?: string | null; preferred_call_time?: string | null }[] = [];
       const errors: string[] = [];
 
       dataLines.forEach((line, index) => {
