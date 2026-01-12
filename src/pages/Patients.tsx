@@ -10,10 +10,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Upload, Search, Trash2, Edit, FileSpreadsheet, Phone, Loader2, Activity } from 'lucide-react';
+import { Plus, Upload, Search, Trash2, Edit, FileSpreadsheet, Phone, Loader2, Activity, FileText } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { CallStatusMonitor } from '@/components/CallStatusMonitor';
 import { HealthMetricsSummary } from '@/components/HealthMetricsSummary';
+import { PDFPatientUpload } from '@/components/PDFPatientUpload';
 
 interface Patient {
   id: string;
@@ -29,6 +30,7 @@ export default function Patients() {
   const [search, setSearch] = useState('');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [pdfUploadOpen, setPdfUploadOpen] = useState(false);
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
   const [callingPatientId, setCallingPatientId] = useState<string | null>(null);
   const [activeCallId, setActiveCallId] = useState<string | null>(null);
@@ -292,6 +294,12 @@ export default function Patients() {
           <p className="text-muted-foreground mt-1">Manage your patient database</p>
         </div>
         <div className="flex gap-3">
+          <Button variant="outline" onClick={() => setPdfUploadOpen(true)}>
+            <FileText className="h-4 w-4 mr-2" />
+            Upload PDF
+          </Button>
+          <PDFPatientUpload open={pdfUploadOpen} onOpenChange={setPdfUploadOpen} />
+          
           <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline">
