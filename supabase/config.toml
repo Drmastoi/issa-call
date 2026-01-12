@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.ai-health-analysis]
 verify_jwt = false
+
+[functions.extract-patient-from-pdf]
+verify_jwt = false
