@@ -15,13 +15,22 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { FileText, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { FileText, Loader2, CheckCircle2, AlertCircle, X, Upload } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 
-interface ExtractedData {
+interface ExtractedPatient {
+  id: string;
+  fileName: string;
   name: string | null;
   phone_number: string | null;
   nhs_number: string | null;
+  status: 'pending' | 'extracting' | 'success' | 'error';
+  error?: string;
+  selected: boolean;
 }
 
 interface PDFPatientUploadProps {
@@ -30,37 +39,34 @@ interface PDFPatientUploadProps {
 }
 
 export function PDFPatientUpload({ open, onOpenChange }: PDFPatientUploadProps) {
-  const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
-  const [isExtracting, setIsExtracting] = useState(false);
-  const [editedData, setEditedData] = useState<ExtractedData>({
-    name: null,
-    phone_number: null,
-    nhs_number: null,
-  });
+  const [patients, setPatients] = useState<ExtractedPatient[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processedCount, setProcessedCount] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const { logAction } = useAuditLog();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const addPatientMutation = useMutation({
-    mutationFn: async (patient: { name: string; phone_number: string; nhs_number?: string | null }) => {
+  const addPatientsMutation = useMutation({
+    mutationFn: async (patientsToAdd: { name: string; phone_number: string; nhs_number?: string | null }[]) => {
       const { data, error } = await supabase
         .from('patients')
-        .insert({ ...patient, created_by: user?.id })
-        .select()
-        .single();
+        .insert(patientsToAdd.map(p => ({ ...p, created_by: user?.id })))
+        .select();
       if (error) throw error;
       return data;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['patients'] });
-      logAction('create', 'patient', data.id, { name: data.name, source: 'pdf_upload' });
-      toast({ title: 'Patient added successfully from PDF' });
+      data.forEach(patient => {
+        logAction('create', 'patient', patient.id, { name: patient.name, source: 'pdf_batch_upload' });
+      });
+      toast({ title: `${data.length} patient(s) added successfully` });
       handleClose();
     },
     onError: (error: Error) => {
-      toast({ variant: 'destructive', title: 'Failed to add patient', description: error.message });
+      toast({ variant: 'destructive', title: 'Failed to add patients', description: error.message });
     },
   });
 
@@ -84,32 +90,14 @@ export function PDFPatientUpload({ open, onOpenChange }: PDFPatientUploadProps) 
     return fullText;
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.type !== 'application/pdf') {
-      toast({
-        variant: 'destructive',
-        title: 'Invalid file type',
-        description: 'Please upload a PDF file',
-      });
-      return;
-    }
-
-    setIsExtracting(true);
-    setExtractedData(null);
-
+  const processFile = async (file: File, id: string): Promise<Partial<ExtractedPatient>> => {
     try {
-      // Extract text from PDF
       const pdfText = await extractTextFromPDF(file);
-      console.log('Extracted PDF text length:', pdfText.length);
-
+      
       if (pdfText.trim().length < 10) {
-        throw new Error('Could not extract text from PDF. The PDF may be scanned or image-based.');
+        return { status: 'error', error: 'Could not extract text from PDF' };
       }
 
-      // Send to AI for extraction
       const { data, error } = await supabase.functions.invoke('extract-patient-from-pdf', {
         body: { pdfText },
       });
@@ -117,187 +105,312 @@ export function PDFPatientUpload({ open, onOpenChange }: PDFPatientUploadProps) 
       if (error) throw error;
 
       if (data.success && data.data) {
-        setExtractedData(data.data);
-        setEditedData(data.data);
-        toast({
-          title: 'Data extracted successfully',
-          description: 'Please review and confirm the extracted information',
-        });
+        return {
+          name: data.data.name,
+          phone_number: data.data.phone_number,
+          nhs_number: data.data.nhs_number,
+          status: 'success',
+          selected: !!(data.data.name && data.data.phone_number),
+        };
       } else {
-        throw new Error(data.error || 'Failed to extract patient data');
+        return { status: 'error', error: data.error || 'Extraction failed' };
       }
     } catch (error) {
-      console.error('PDF extraction error:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Extraction failed',
-        description: error instanceof Error ? error.message : 'Failed to extract data from PDF',
-      });
-    } finally {
-      setIsExtracting(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      return { 
+        status: 'error', 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
     }
   };
 
-  const handleAddPatient = () => {
-    if (!editedData.name || !editedData.phone_number) {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const invalidFiles = files.filter(f => f.type !== 'application/pdf');
+    if (invalidFiles.length > 0) {
       toast({
         variant: 'destructive',
-        title: 'Missing required fields',
-        description: 'Name and phone number are required',
+        title: 'Invalid file type',
+        description: `${invalidFiles.length} file(s) skipped - only PDF files are accepted`,
+      });
+    }
+
+    const pdfFiles = files.filter(f => f.type === 'application/pdf');
+    if (pdfFiles.length === 0) return;
+
+    // Initialize patient entries
+    const initialPatients: ExtractedPatient[] = pdfFiles.map((file, index) => ({
+      id: `${Date.now()}-${index}`,
+      fileName: file.name,
+      name: null,
+      phone_number: null,
+      nhs_number: null,
+      status: 'pending',
+      selected: false,
+    }));
+
+    setPatients(prev => [...prev, ...initialPatients]);
+    setIsProcessing(true);
+    setProcessedCount(0);
+
+    // Process files sequentially to avoid rate limiting
+    for (let i = 0; i < pdfFiles.length; i++) {
+      const file = pdfFiles[i];
+      const patientId = initialPatients[i].id;
+
+      // Update status to extracting
+      setPatients(prev => prev.map(p => 
+        p.id === patientId ? { ...p, status: 'extracting' } : p
+      ));
+
+      const result = await processFile(file, patientId);
+
+      // Update with result
+      setPatients(prev => prev.map(p => 
+        p.id === patientId ? { ...p, ...result } : p
+      ));
+
+      setProcessedCount(i + 1);
+    }
+
+    setIsProcessing(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+
+    toast({
+      title: 'Processing complete',
+      description: `${pdfFiles.length} PDF(s) processed`,
+    });
+  };
+
+  const handlePatientEdit = (id: string, field: keyof ExtractedPatient, value: string | boolean) => {
+    setPatients(prev => prev.map(p => 
+      p.id === id ? { ...p, [field]: value || null } : p
+    ));
+  };
+
+  const handleRemovePatient = (id: string) => {
+    setPatients(prev => prev.filter(p => p.id !== id));
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    setPatients(prev => prev.map(p => ({
+      ...p,
+      selected: p.status === 'success' && !!p.name && !!p.phone_number ? checked : false
+    })));
+  };
+
+  const handleAddSelectedPatients = () => {
+    const selectedPatients = patients.filter(p => 
+      p.selected && p.name && p.phone_number
+    );
+
+    if (selectedPatients.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'No patients selected',
+        description: 'Please select at least one patient with valid data',
       });
       return;
     }
 
-    addPatientMutation.mutate({
-      name: editedData.name,
-      phone_number: editedData.phone_number,
-      nhs_number: editedData.nhs_number,
-    });
+    addPatientsMutation.mutate(
+      selectedPatients.map(p => ({
+        name: p.name!,
+        phone_number: p.phone_number!,
+        nhs_number: p.nhs_number,
+      }))
+    );
   };
 
   const handleClose = () => {
-    setExtractedData(null);
-    setEditedData({ name: null, phone_number: null, nhs_number: null });
-    setIsExtracting(false);
+    setPatients([]);
+    setIsProcessing(false);
+    setProcessedCount(0);
     onOpenChange(false);
   };
 
+  const successfulPatients = patients.filter(p => p.status === 'success');
+  const selectedCount = patients.filter(p => p.selected).length;
+  const validSelectedCount = patients.filter(p => p.selected && p.name && p.phone_number).length;
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle>Upload PDF Summary</DialogTitle>
+          <DialogTitle>Batch Upload PDF Summaries</DialogTitle>
           <DialogDescription>
-            Upload a patient summary PDF. AI will extract the name and phone number automatically.
+            Upload multiple patient summary PDFs. AI will extract patient information from each file.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          {!extractedData && (
-            <Card className="border-dashed">
-              <CardContent className="pt-6">
-                <div className="flex flex-col items-center gap-4">
-                  {isExtracting ? (
-                    <>
-                      <Loader2 className="h-12 w-12 text-primary animate-spin" />
-                      <div className="text-center">
-                        <p className="text-sm font-medium">Extracting patient data...</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          AI is analyzing the PDF content
-                        </p>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <FileText className="h-12 w-12 text-muted-foreground" />
-                      <div className="text-center">
-                        <p className="text-sm font-medium">Upload Patient Summary PDF</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          AI will extract name, phone number, and NHS number
-                        </p>
-                      </div>
-                      <Input
-                        ref={fileInputRef}
-                        type="file"
-                        accept=".pdf"
-                        onChange={handleFileUpload}
-                        className="max-w-xs"
-                      />
-                    </>
-                  )}
+          {/* Upload Area */}
+          <Card className="border-dashed">
+            <CardContent className="pt-6">
+              <div className="flex flex-col items-center gap-4">
+                <Upload className="h-10 w-10 text-muted-foreground" />
+                <div className="text-center">
+                  <p className="text-sm font-medium">
+                    {isProcessing ? 'Processing PDFs...' : 'Upload Patient Summary PDFs'}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Select multiple PDF files to process at once
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
+                <Input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf"
+                  multiple
+                  onChange={handleFileUpload}
+                  disabled={isProcessing}
+                  className="max-w-xs"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Progress Bar */}
+          {isProcessing && patients.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Processing...</span>
+                <span>{processedCount} / {patients.filter(p => p.status !== 'success' && p.status !== 'error').length + processedCount}</span>
+              </div>
+              <Progress value={(processedCount / patients.length) * 100} />
+            </div>
           )}
 
-          {extractedData && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-green-600">
-                <CheckCircle2 className="h-5 w-5" />
-                <span className="text-sm font-medium">Data extracted - please review</span>
-              </div>
-
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <Label htmlFor="extracted-name">
-                    Full Name *
-                    {!editedData.name && (
-                      <span className="text-destructive ml-2 text-xs">
-                        <AlertCircle className="h-3 w-3 inline mr-1" />
-                        Not found
-                      </span>
-                    )}
+          {/* Patients List */}
+          {patients.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    checked={successfulPatients.length > 0 && successfulPatients.every(p => p.selected)}
+                    onCheckedChange={handleSelectAll}
+                    disabled={successfulPatients.length === 0}
+                  />
+                  <Label className="text-sm font-medium">
+                    Select all ({selectedCount} selected)
                   </Label>
-                  <Input
-                    id="extracted-name"
-                    value={editedData.name || ''}
-                    onChange={(e) => setEditedData({ ...editedData, name: e.target.value || null })}
-                    placeholder="Enter patient name"
-                  />
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="extracted-phone">
-                    Phone Number *
-                    {!editedData.phone_number && (
-                      <span className="text-destructive ml-2 text-xs">
-                        <AlertCircle className="h-3 w-3 inline mr-1" />
-                        Not found
-                      </span>
-                    )}
-                  </Label>
-                  <Input
-                    id="extracted-phone"
-                    value={editedData.phone_number || ''}
-                    onChange={(e) => setEditedData({ ...editedData, phone_number: e.target.value || null })}
-                    placeholder="Enter phone number"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="extracted-nhs">NHS Number</Label>
-                  <Input
-                    id="extracted-nhs"
-                    value={editedData.nhs_number || ''}
-                    onChange={(e) => setEditedData({ ...editedData, nhs_number: e.target.value || null })}
-                    placeholder="Optional"
-                  />
+                <div className="flex gap-2">
+                  <Badge variant="outline">{patients.length} total</Badge>
+                  <Badge variant="secondary" className="bg-green-100 text-green-800">
+                    {successfulPatients.length} extracted
+                  </Badge>
                 </div>
               </div>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setExtractedData(null);
-                  setEditedData({ name: null, phone_number: null, nhs_number: null });
-                }}
-              >
-                Upload Different PDF
-              </Button>
+              <ScrollArea className="h-[300px] rounded-md border p-3">
+                <div className="space-y-3">
+                  {patients.map((patient) => (
+                    <Card key={patient.id} className={`relative ${patient.status === 'error' ? 'border-destructive/50' : ''}`}>
+                      <CardContent className="p-3">
+                        <div className="flex items-start gap-3">
+                          {patient.status === 'success' && (
+                            <Checkbox
+                              checked={patient.selected}
+                              onCheckedChange={(checked) => handlePatientEdit(patient.id, 'selected', !!checked)}
+                              disabled={!patient.name || !patient.phone_number}
+                              className="mt-1"
+                            />
+                          )}
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2">
+                              <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                              <span className="text-xs text-muted-foreground truncate">
+                                {patient.fileName}
+                              </span>
+                              {patient.status === 'extracting' && (
+                                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                              )}
+                              {patient.status === 'success' && (
+                                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              )}
+                              {patient.status === 'error' && (
+                                <Badge variant="destructive" className="text-xs">
+                                  {patient.error}
+                                </Badge>
+                              )}
+                            </div>
+
+                            {patient.status === 'success' && (
+                              <div className="grid grid-cols-3 gap-2">
+                                <div>
+                                  <Label className="text-xs">Name *</Label>
+                                  <Input
+                                    value={patient.name || ''}
+                                    onChange={(e) => handlePatientEdit(patient.id, 'name', e.target.value)}
+                                    placeholder="Name"
+                                    className="h-8 text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs">Phone *</Label>
+                                  <Input
+                                    value={patient.phone_number || ''}
+                                    onChange={(e) => handlePatientEdit(patient.id, 'phone_number', e.target.value)}
+                                    placeholder="Phone"
+                                    className="h-8 text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs">NHS #</Label>
+                                  <Input
+                                    value={patient.nhs_number || ''}
+                                    onChange={(e) => handlePatientEdit(patient.id, 'nhs_number', e.target.value)}
+                                    placeholder="Optional"
+                                    className="h-8 text-sm"
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+                            {patient.status === 'pending' && (
+                              <p className="text-xs text-muted-foreground">Waiting...</p>
+                            )}
+                          </div>
+
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 shrink-0"
+                            onClick={() => handleRemovePatient(patient.id)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </ScrollArea>
             </div>
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-col sm:flex-row gap-2">
           <Button variant="outline" onClick={handleClose}>
             Cancel
           </Button>
-          {extractedData && (
+          {patients.length > 0 && (
             <Button
-              onClick={handleAddPatient}
-              disabled={addPatientMutation.isPending || !editedData.name || !editedData.phone_number}
+              onClick={handleAddSelectedPatients}
+              disabled={addPatientsMutation.isPending || validSelectedCount === 0 || isProcessing}
             >
-              {addPatientMutation.isPending ? (
+              {addPatientsMutation.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Adding...
                 </>
               ) : (
-                'Add Patient'
+                `Add ${validSelectedCount} Patient${validSelectedCount !== 1 ? 's' : ''}`
               )}
             </Button>
           )}
