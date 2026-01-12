@@ -44,7 +44,7 @@ Respond ONLY with valid JSON in this exact format (no markdown, no explanation):
 
 If you cannot find a field, use null. For phone numbers, try to format as UK mobile (+44...) if possible.`;
 
-    const response = await fetch("https://api.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${LOVABLE_API_KEY}`,
