@@ -17,10 +17,6 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { FileText, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import * as pdfjs from 'pdfjs-dist';
-
-// Set up PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 interface ExtractedData {
   name: string | null;
@@ -69,6 +65,10 @@ export function PDFPatientUpload({ open, onOpenChange }: PDFPatientUploadProps) 
   });
 
   const extractTextFromPDF = async (file: File): Promise<string> => {
+    // Dynamically import pdfjs-dist to avoid top-level await issues
+    const pdfjs = await import('pdfjs-dist');
+    pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+    
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
     let fullText = '';
