@@ -352,11 +352,11 @@ serve(async (req) => {
       // Get patient info
       const { data: patient } = await supabase
         .from('patients')
-        .select('first_name, last_name')
+        .select('name')
         .eq('id', patient_id)
         .single();
 
-      const patientName = patient ? `${patient.first_name} ${patient.last_name}` : 'Unknown Patient';
+      const patientName = patient?.name || 'Unknown Patient';
 
       // Get recent call responses
       const { data: responses } = await supabase
@@ -393,7 +393,7 @@ serve(async (req) => {
       // Batch analysis for all patients
       const { data: patients } = await supabase
         .from('patients')
-        .select('id, first_name, last_name');
+        .select('id, name');
 
       let totalAlerts = 0;
       const allAlerts: HealthAlert[] = [];
@@ -407,7 +407,7 @@ serve(async (req) => {
           .limit(10);
 
         if (responses && responses.length > 0) {
-          const patientName = `${patient.first_name} ${patient.last_name}`;
+          const patientName = patient.name || 'Unknown Patient';
           const alerts = analyzePatientMetrics(responses as CallResponse[], patientName);
           allAlerts.push(...alerts);
           totalAlerts += alerts.length;
@@ -432,7 +432,7 @@ serve(async (req) => {
       // Get call and response data
       const { data: call } = await supabase
         .from('calls')
-        .select('*, patients(first_name, last_name)')
+        .select('*, patients(name)')
         .eq('id', call_id)
         .single();
 
@@ -449,7 +449,7 @@ serve(async (req) => {
         });
       }
 
-      const patientName = call.patients ? `${call.patients.first_name} ${call.patients.last_name}` : 'Unknown';
+      const patientName = call.patients?.name || 'Unknown';
       const summary = await generateClinicalSummary(response.transcript, response as CallResponse, patientName);
 
       // Store the summary
