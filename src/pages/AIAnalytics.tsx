@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,11 +38,13 @@ import {
   Info,
   ListChecks,
   Sparkles,
-  BarChart3
+  BarChart3,
+  Zap
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { QOF_INDICATORS, QOF_CATEGORIES, calculateQOFProgress } from '@/lib/qof-codes';
 import QOFActionList from '@/components/qof/QOFActionList';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area, BarChart, Bar, Legend } from 'recharts';
 
 type GapFilter = 'all' | 'bp' | 'smoking' | 'no-data';
 type PriorityFilter = 'all' | 'high' | 'medium' | 'normal';
@@ -295,6 +297,55 @@ export default function AIAnalytics() {
       r.blood_pressure_systolic <= 140 && r.blood_pressure_diastolic <= 90
     ).length,
   };
+
+  // Calculate trend data for charts
+  const trendData = useMemo(() => {
+    const last6Months = [];
+    const now = new Date();
+    
+    for (let i = 5; i >= 0; i--) {
+      const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+      const monthLabel = monthDate.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+      
+      // Filter call responses for this month
+      const monthResponses = callResponses.filter(r => {
+        const date = new Date(r.collected_at);
+        return date >= monthDate && date <= monthEnd;
+      });
+      
+      // Filter AI summaries for this month
+      const monthSummaries = aiSummaries.filter((s: any) => {
+        const date = new Date(s.created_at);
+        return date >= monthDate && date <= monthEnd;
+      });
+      
+      // Calculate BP control rate
+      const bpResponses = monthResponses.filter(r => r.blood_pressure_systolic && r.blood_pressure_diastolic);
+      const bpControlled = bpResponses.filter(r => 
+        r.blood_pressure_systolic! <= 140 && r.blood_pressure_diastolic! <= 90
+      );
+      
+      last6Months.push({
+        month: monthLabel,
+        dataCollected: monthResponses.length,
+        aiSummaries: monthSummaries.length,
+        bpControlRate: bpResponses.length > 0 ? Math.round((bpControlled.length / bpResponses.length) * 100) : 0,
+        uniquePatients: new Set(monthResponses.map(r => r.patient_id)).size,
+      });
+    }
+    
+    return last6Months;
+  }, [callResponses, aiSummaries]);
+
+  // Cohort comparison data
+  const cohortData = useMemo(() => [
+    { name: 'Hypertension', patients: patientCohorts.hypertension.length, controlled: kpis.bpControlled, color: 'hsl(var(--destructive))' },
+    { name: 'Diabetes', patients: patientCohorts.diabetes.length, controlled: kpis.diabeticControlled, color: 'hsl(var(--primary))' },
+    { name: 'CHD', patients: patientCohorts.chd.length, controlled: 0, color: 'hsl(var(--accent))' },
+    { name: 'Respiratory', patients: patientCohorts.asthma.length + patientCohorts.copd.length, controlled: 0, color: 'hsl(var(--warning))' },
+    { name: 'Mental Health', patients: patientCohorts.mentalHealth.length, controlled: 0, color: 'hsl(var(--muted-foreground))' },
+  ], [patientCohorts, kpis]);
 
   // Calculate QOF progress for each indicator using real patient data
   const getIndicatorProgress = (indicator: typeof QOF_INDICATORS[0]) => {
@@ -560,34 +611,35 @@ export default function AIAnalytics() {
   return (
     <TooltipProvider>
       <div className="p-6 lg:p-8 space-y-6">
-        {/* Enhanced Header */}
+        {/* Enhanced Header with AI Glow Effects */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 animate-fade-in">
           <div className="flex items-center gap-4">
-            <div className="relative p-3 bg-gradient-to-br from-primary/20 to-primary/10 rounded-2xl shadow-sm">
+            <div className="relative p-4 ai-gradient-border rounded-2xl ai-glow animate-float">
               <Brain className="h-8 w-8 text-primary" />
-              <Sparkles className="absolute -top-1 -right-1 h-4 w-4 text-primary animate-pulse" />
+              <Sparkles className="absolute -top-1 -right-1 h-4 w-4 text-primary sparkle-pulse" />
+              <Zap className="absolute -bottom-1 -left-1 h-3 w-3 text-accent sparkle-pulse" style={{ animationDelay: '0.5s' }} />
             </div>
             <div>
-              <h1 className="text-2xl lg:text-3xl font-bold text-foreground flex items-center gap-2">
+              <h1 className="text-2xl lg:text-3xl font-bold text-foreground flex items-center gap-2 flex-wrap">
                 AI Analytics
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
-                  <Sparkles className="h-3 w-3 mr-1" />
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-primary/20 to-accent/20 text-primary border border-primary/30 ai-glow">
+                  <Sparkles className="h-3 w-3 mr-1.5 sparkle-pulse" />
                   Powered by AI
                 </span>
               </h1>
-              <p className="text-muted-foreground">Quality and Outcomes Framework tracking & insights</p>
+              <p className="text-muted-foreground mt-1">Intelligent Quality and Outcomes Framework tracking & insights</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={exportFullReport} className="gap-2">
+            <Button variant="outline" size="sm" onClick={exportFullReport} className="gap-2 hover:shadow-md transition-all">
               <Download className="h-4 w-4" />
               Summary
             </Button>
-            <Button variant="outline" size="sm" onClick={exportQOFProgress} className="gap-2">
+            <Button variant="outline" size="sm" onClick={exportQOFProgress} className="gap-2 hover:shadow-md transition-all">
               <Download className="h-4 w-4" />
               Full Report
             </Button>
-            <Button variant="outline" size="sm" onClick={exportQOFGaps} className="gap-2">
+            <Button variant="outline" size="sm" onClick={exportQOFGaps} className="gap-2 hover:shadow-md transition-all">
               <Download className="h-4 w-4" />
               Gaps List
             </Button>
@@ -793,6 +845,133 @@ export default function AIAnalytics() {
             )}
           </CardContent>
         </Card>
+
+        {/* Trends & Analytics Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in" style={{ animationDelay: '420ms' }}>
+          {/* Data Collection Trend */}
+          <Card className="shadow-sm overflow-hidden">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-primary/20 to-primary/10 rounded-lg">
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <CardTitle className="text-base">Data Collection Trends</CardTitle>
+                  <CardDescription>Patient data and AI summaries over time</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[280px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorData" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorAI" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis 
+                      dataKey="month" 
+                      tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                      axisLine={{ stroke: 'hsl(var(--border))' }}
+                    />
+                    <YAxis 
+                      tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                      axisLine={{ stroke: 'hsl(var(--border))' }}
+                    />
+                    <RechartsTooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))', 
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                      }}
+                    />
+                    <Legend />
+                    <Area 
+                      type="monotone" 
+                      dataKey="dataCollected" 
+                      name="Data Points" 
+                      stroke="hsl(var(--primary))" 
+                      fillOpacity={1} 
+                      fill="url(#colorData)" 
+                      strokeWidth={2}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="aiSummaries" 
+                      name="AI Summaries" 
+                      stroke="hsl(var(--accent))" 
+                      fillOpacity={1} 
+                      fill="url(#colorAI)" 
+                      strokeWidth={2}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Cohort Comparison Chart */}
+          <Card className="shadow-sm overflow-hidden">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-accent/20 to-accent/10 rounded-lg">
+                  <BarChart3 className="h-5 w-5 text-accent" />
+                </div>
+                <div>
+                  <CardTitle className="text-base">Cohort Analysis</CardTitle>
+                  <CardDescription>Patient distribution by clinical condition</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[280px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={cohortData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis 
+                      dataKey="name" 
+                      tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                      axisLine={{ stroke: 'hsl(var(--border))' }}
+                    />
+                    <YAxis 
+                      tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                      axisLine={{ stroke: 'hsl(var(--border))' }}
+                    />
+                    <RechartsTooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))', 
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                      }}
+                    />
+                    <Legend />
+                    <Bar 
+                      dataKey="patients" 
+                      name="Total Patients" 
+                      fill="hsl(var(--primary))" 
+                      radius={[4, 4, 0, 0]}
+                    />
+                    <Bar 
+                      dataKey="controlled" 
+                      name="Controlled" 
+                      fill="hsl(var(--accent))" 
+                      radius={[4, 4, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Main Tabs */}
         <Tabs value={viewTab} onValueChange={(v) => setViewTab(v as ViewTab)} className="w-full animate-fade-in" style={{ animationDelay: '450ms' }}>
