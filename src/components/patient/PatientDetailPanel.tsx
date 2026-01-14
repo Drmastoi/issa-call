@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -7,12 +8,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { 
   User, Heart, Activity, Cigarette, Wine, Scale, Ruler, 
   Calendar, AlertTriangle, CheckCircle, XCircle, Brain,
   HeartPulse, Wind, Pill, FileText, Phone, Clock, Shield,
-  UserCheck, Stethoscope, Home, Accessibility, Apple, MessageSquare, Sparkles, Loader2
+  UserCheck, Stethoscope, Home, Accessibility, Apple, MessageSquare, Sparkles, Loader2, RefreshCw
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -93,6 +95,34 @@ interface Call {
 export function PatientDetailPanel({ patientId, isOpen, onClose }: PatientDetailPanelProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [extractText, setExtractText] = useState('');
+  const [showExtractDialog, setShowExtractDialog] = useState(false);
+
+  // AI extraction mutation
+  const extractMutation = useMutation({
+    mutationFn: async ({ patientId, documentText }: { patientId: string; documentText: string }) => {
+      const { data, error } = await supabase.functions.invoke('extract-patient-data', {
+        body: { patientId, documentText }
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast({ title: 'Data extracted successfully', description: 'Patient information has been updated with AI-extracted data.' });
+      queryClient.invalidateQueries({ queryKey: ['patient-detail', patientId] });
+      setShowExtractDialog(false);
+      setExtractText('');
+    },
+    onError: (error: Error) => {
+      if (error.message.includes('429')) {
+        toast({ variant: 'destructive', title: 'Rate limit exceeded', description: 'Please try again in a moment.' });
+      } else if (error.message.includes('402')) {
+        toast({ variant: 'destructive', title: 'AI credits exhausted', description: 'Please add credits to continue using AI features.' });
+      } else {
+        toast({ variant: 'destructive', title: 'Extraction failed', description: error.message });
+      }
+    }
+  });
 
   // Fetch patient data
   const { data: patient, isLoading: patientLoading } = useQuery({
@@ -378,6 +408,81 @@ export function PatientDetailPanel({ patientId, isOpen, onClose }: PatientDetail
             {/* Overview Tab - New AI Extracted Data */}
             <TabsContent value="overview" className="m-0">
               <div className="space-y-4">
+                {/* AI Extract Action Card */}
+                <Card className="border-dashed">
+                  <CardContent className="pt-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-primary/10 rounded-full">
+                          <Sparkles className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm">AI Data Extraction</p>
+                          <p className="text-xs text-muted-foreground">
+                            {patient.ai_extracted_at 
+                              ? `Last extracted ${formatDate(patient.ai_extracted_at)}` 
+                              : 'Paste patient summary to extract data'}
+                          </p>
+                        </div>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setShowExtractDialog(true)}
+                        disabled={extractMutation.isPending}
+                      >
+                        <RefreshCw className={`h-4 w-4 mr-2 ${extractMutation.isPending ? 'animate-spin' : ''}`} />
+                        {patient.ai_extracted_at ? 'Re-extract Data' : 'Extract Data'}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Extract Dialog */}
+                <Dialog open={showExtractDialog} onOpenChange={setShowExtractDialog}>
+                  <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        <Sparkles className="h-5 w-5 text-primary" />
+                        Extract Patient Data with AI
+                      </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <p className="text-sm text-muted-foreground">
+                        Paste the patient summary, discharge letter, or clinical notes below. 
+                        AI will extract key information like DNACPR status, allergies, next of kin, and more.
+                      </p>
+                      <Textarea
+                        placeholder="Paste patient summary here..."
+                        value={extractText}
+                        onChange={(e) => setExtractText(e.target.value)}
+                        className="min-h-[200px]"
+                      />
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => setShowExtractDialog(false)}>
+                          Cancel
+                        </Button>
+                        <Button 
+                          onClick={() => extractMutation.mutate({ patientId, documentText: extractText })}
+                          disabled={!extractText.trim() || extractMutation.isPending}
+                        >
+                          {extractMutation.isPending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Extracting...
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="h-4 w-4 mr-2" />
+                              Extract Data
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
                 {/* AI Extracted Summary */}
                 {patient.ai_extracted_summary && (
                   <Card className="border-primary/20 bg-primary/5">

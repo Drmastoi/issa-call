@@ -47,18 +47,49 @@ export function DocumentPatientUpload({ open, onOpenChange }: DocumentPatientUpl
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
+  // Store extracted text for each patient for AI extraction
+  const [extractedTexts, setExtractedTexts] = useState<Record<string, string>>({});
+
   const addPatientsMutation = useMutation({
-    mutationFn: async (patientsData: { name: string; phone_number: string; nhs_number: string }[]) => {
+    mutationFn: async (patientsData: { name: string; phone_number: string; nhs_number: string; extractedText?: string }[]) => {
       const { data, error } = await supabase
         .from("patients")
-        .insert(patientsData)
+        .insert(patientsData.map(p => ({
+          name: p.name,
+          phone_number: p.phone_number,
+          nhs_number: p.nhs_number
+        })))
         .select();
       
       if (error) throw error;
+      
+      // Trigger AI extraction for each patient with extracted text
+      const extractionPromises = data.map(async (patient, index) => {
+        const patientWithText = patientsData[index];
+        if (patientWithText.extractedText) {
+          try {
+            await supabase.functions.invoke('extract-patient-data', {
+              body: { 
+                patientId: patient.id, 
+                documentText: patientWithText.extractedText 
+              }
+            });
+          } catch (err) {
+            console.error(`AI extraction failed for patient ${patient.name}:`, err);
+          }
+        }
+      });
+      
+      // Run extractions in background (don't block the main flow)
+      Promise.all(extractionPromises).then(() => {
+        toast.success('AI extraction completed for all patients');
+        queryClient.invalidateQueries({ queryKey: ["patients"] });
+      });
+      
       return data;
     },
     onSuccess: (data) => {
-      toast.success(`Successfully added ${data.length} patients`);
+      toast.success(`Successfully added ${data.length} patients. AI extraction in progress...`);
       queryClient.invalidateQueries({ queryKey: ["patients"] });
       handleClose();
     },
@@ -89,7 +120,7 @@ export function DocumentPatientUpload({ open, onOpenChange }: DocumentPatientUpl
     return parseRTF(rtfContent);
   };
 
-  const processFile = async (file: File, id: string): Promise<Partial<ExtractedPatient>> => {
+  const processFile = async (file: File, id: string): Promise<Partial<ExtractedPatient> & { extractedText?: string }> => {
     try {
       const fileType = file.name.toLowerCase().endsWith('.rtf') ? 'rtf' : 'pdf';
       let text: string;
@@ -127,12 +158,16 @@ export function DocumentPatientUpload({ open, onOpenChange }: DocumentPatientUpl
         };
       }
 
+      // Store the extracted text for later AI extraction
+      setExtractedTexts(prev => ({ ...prev, [id]: text }));
+
       return {
         name: patientData.name || "",
         phone_number: patientData.phone_number || "",
         nhs_number: patientData.nhs_number || "",
         status: "success",
         fileType,
+        extractedText: text,
       };
     } catch (error: any) {
       return {
@@ -220,6 +255,7 @@ export function DocumentPatientUpload({ open, onOpenChange }: DocumentPatientUpl
         name: p.name,
         phone_number: p.phone_number,
         nhs_number: p.nhs_number,
+        extractedText: extractedTexts[p.id] || undefined,
       }));
 
     if (selectedPatients.length === 0) {
@@ -232,6 +268,7 @@ export function DocumentPatientUpload({ open, onOpenChange }: DocumentPatientUpl
 
   const handleClose = () => {
     setPatients([]);
+    setExtractedTexts({});
     setProcessedCount(0);
     setIsProcessing(false);
     onOpenChange(false);
