@@ -5,31 +5,54 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useDashboardInsights } from "@/hooks/useHealthAlerts";
-import { QOF_INDICATORS, calculateQOFProgress } from "@/lib/qof-codes";
+import { QOF_INDICATORS } from "@/lib/qof-codes";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
+
+interface CoverageData {
+  recorded: number;
+  total: number;
+}
+
+function calculateProgress(recorded: number, total: number, targetPercent: number) {
+  const percent = total > 0 ? Math.round((recorded / total) * 100) : 0;
+  const status = percent >= targetPercent ? 'good' : percent >= targetPercent * 0.8 ? 'warning' : 'poor';
+  const pointsEarned = Math.min(percent, targetPercent);
+  return { percent, status, pointsEarned };
+}
 
 export function QOFProgressPanel() {
   const { data: insights, isLoading } = useDashboardInsights();
   const navigate = useNavigate();
 
-  const getCoverageData = (indicatorId: string) => {
+  // Map QOF indicator IDs to coverage data
+  const getCoverageData = (indicatorId: string): CoverageData => {
     if (!insights) return { recorded: 0, total: 0 };
     
+    // Map indicator IDs to actual coverage data
     switch (indicatorId) {
-      case 'hypertension_monitoring':
+      case 'hyp008':
+      case 'hyp009':
+      case 'chd015':
+      case 'chd016':
+      case 'stia014':
+      case 'stia015':
+      case 'dm036':
         return insights.bp_coverage;
-      case 'smoking_status':
-      case 'smoking_cessation':
+      case 'smok002':
         return insights.smoking_coverage;
-      case 'bmi_recording':
-        return insights.bmi_coverage;
-      case 'alcohol_screening':
-        return insights.bmi_coverage; // Using same as proxy for now
+      case 'dm006':
+      case 'dm012':
+        return insights.bmi_coverage; // Using as proxy for HbA1c
       default:
         return { recorded: 0, total: 0 };
     }
   };
+
+  // Select key indicators to display
+  const displayIndicators = QOF_INDICATORS.filter(i => 
+    ['hyp008', 'smok002', 'dm006', 'chol003'].includes(i.id)
+  );
 
   if (isLoading) {
     return (
@@ -51,12 +74,19 @@ export function QOFProgressPanel() {
     );
   }
 
-  // Calculate overall QOF score
-  const overallScore = QOF_INDICATORS.reduce((acc, indicator) => {
-    const coverage = getCoverageData(indicator.id);
-    const { pointsEarned } = calculateQOFProgress(indicator, coverage.recorded, coverage.total);
-    return acc + pointsEarned;
-  }, 0) / QOF_INDICATORS.length;
+  // Calculate overall QOF score based on available data
+  const coverageMetrics = [
+    { ...insights?.bp_coverage, target: 77 },
+    { ...insights?.smoking_coverage, target: 90 },
+    { ...insights?.bmi_coverage, target: 70 },
+  ].filter(m => m && m.total > 0);
+
+  const overallScore = coverageMetrics.length > 0
+    ? coverageMetrics.reduce((acc, metric) => {
+        const percent = metric.total > 0 ? (metric.recorded / metric.total) * 100 : 0;
+        return acc + Math.min(percent, metric.target);
+      }, 0) / coverageMetrics.length
+    : 0;
 
   return (
     <Card>
@@ -69,7 +99,7 @@ export function QOFProgressPanel() {
           <Button 
             variant="outline" 
             size="sm"
-            onClick={() => navigate('/qof-reports')}
+            onClick={() => navigate('/ai-analytics')}
           >
             <FileText className="h-4 w-4 mr-1" />
             Reports
@@ -89,9 +119,9 @@ export function QOFProgressPanel() {
       </CardHeader>
       <CardContent className="space-y-4">
         <TooltipProvider>
-          {QOF_INDICATORS.slice(0, 4).map((indicator) => {
+          {displayIndicators.map((indicator) => {
             const coverage = getCoverageData(indicator.id);
-            const { percent, status } = calculateQOFProgress(indicator, coverage.recorded, coverage.total);
+            const { percent, status } = calculateProgress(coverage.recorded, coverage.total, indicator.targetPercent);
             
             return (
               <Tooltip key={indicator.id}>
@@ -99,9 +129,9 @@ export function QOFProgressPanel() {
                   <div className="space-y-1.5 cursor-help">
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
-                        <span className="font-medium">{indicator.name}</span>
+                        <span className="font-medium truncate max-w-[120px]">{indicator.name}</span>
                         <Badge variant="outline" className="text-xs font-mono">
-                          {indicator.readCode}
+                          {indicator.code}
                         </Badge>
                       </div>
                       <div className="flex items-center gap-2">
@@ -140,9 +170,6 @@ export function QOFProgressPanel() {
                 <TooltipContent side="left" className="max-w-xs">
                   <p className="font-medium">{indicator.name}</p>
                   <p className="text-xs text-muted-foreground mt-1">{indicator.description}</p>
-                  <p className="text-xs mt-2">
-                    <span className="font-mono">SNOMED: {indicator.snomedCode}</span>
-                  </p>
                 </TooltipContent>
               </Tooltip>
             );
@@ -153,10 +180,10 @@ export function QOFProgressPanel() {
           variant="outline" 
           size="sm" 
           className="w-full"
-          onClick={() => navigate('/qof-reports')}
+          onClick={() => navigate('/ai-analytics')}
         >
           <Download className="h-4 w-4 mr-2" />
-          Export QOF Report
+          View Full QOF Analytics
         </Button>
       </CardContent>
     </Card>
