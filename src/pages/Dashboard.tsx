@@ -1,22 +1,64 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
   Users, Phone, Calendar, CheckCircle, XCircle, Clock, ArrowRight, 
-  TrendingUp, TrendingDown, Plus, Upload, BarChart3, Sparkles
+  TrendingUp, TrendingDown, Plus, Upload, BarChart3, Sparkles,
+  Settings2, RotateCcw, X
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AIInsightsPanel } from '@/components/dashboard/AIInsightsPanel';
 import { RiskAlertsWidget } from '@/components/dashboard/RiskAlertsWidget';
 import { QOFProgressPanel } from '@/components/dashboard/QOFProgressPanel';
 import { MediTaskWidget } from '@/components/dashboard/MediTaskWidget';
+import { DraggableWidget } from '@/components/dashboard/DraggableWidget';
+import { useDashboardLayout } from '@/hooks/useDashboardLayout';
 import issaCareLogo from '@/assets/issa-care-logo.jpg';
 import { format } from 'date-fns';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+} from '@dnd-kit/sortable';
+import { useState } from 'react';
+import { Badge } from '@/components/ui/badge';
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { 
+    widgets, 
+    isEditMode, 
+    reorderWidgets, 
+    toggleWidgetVisibility, 
+    resetLayout, 
+    toggleEditMode 
+  } = useDashboardLayout();
   
+  const [activeId, setActiveId] = useState<string | null>(null);
+  
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   const { data: stats } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: async () => {
@@ -67,6 +109,19 @@ export default function Dashboard() {
     },
   });
 
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+    
+    if (over && active.id !== over.id) {
+      reorderWidgets(active.id as string, over.id as string);
+    }
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'completed':
@@ -79,7 +134,6 @@ export default function Dashboard() {
     }
   };
 
-  // Get greeting based on time of day
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good morning';
@@ -88,6 +142,107 @@ export default function Dashboard() {
   };
 
   const successRate = stats?.totalCalls ? Math.round((stats.completedCalls / stats.totalCalls) * 100) : 0;
+
+  // Widget renderer
+  const renderWidget = (widgetId: string) => {
+    switch (widgetId) {
+      case 'ai-insights':
+        return <AIInsightsPanel />;
+      case 'risk-alerts':
+        return <RiskAlertsWidget maxItems={4} />;
+      case 'qof-progress':
+        return <QOFProgressPanel />;
+      case 'meditask':
+        return <MediTaskWidget />;
+      case 'recent-calls':
+        return (
+          <Card className="h-full shadow-sm hover:shadow-md transition-shadow">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Phone className="h-4 w-4 text-primary" />
+                  Recent Calls
+                </CardTitle>
+                <Button asChild variant="ghost" size="sm">
+                  <Link to="/calls">View All</Link>
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {recentCalls && recentCalls.length > 0 ? (
+                <div className="space-y-3">
+                  {recentCalls.slice(0, 4).map((call: any) => (
+                    <div key={call.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center gap-3">
+                        {getStatusIcon(call.status)}
+                        <div>
+                          <p className="text-sm font-medium">{call.patients?.name ?? 'Unknown'}</p>
+                          <p className="text-xs text-muted-foreground">{call.patients?.phone_number}</p>
+                        </div>
+                      </div>
+                      <span className="text-xs text-muted-foreground capitalize px-2 py-1 rounded-full bg-muted">
+                        {call.status.replace('_', ' ')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-center py-6 text-sm">No calls yet</p>
+              )}
+            </CardContent>
+          </Card>
+        );
+      case 'upcoming-batches':
+        return (
+          <Card className="h-full shadow-sm hover:shadow-md transition-shadow">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-primary" />
+                  Upcoming Batches
+                </CardTitle>
+                <Button asChild variant="ghost" size="sm">
+                  <Link to="/batches">View All</Link>
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {upcomingBatches && upcomingBatches.length > 0 ? (
+                <div className="space-y-3">
+                  {upcomingBatches.slice(0, 4).map((batch) => (
+                    <div key={batch.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                      <div>
+                        <p className="text-sm font-medium">{batch.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(batch.scheduled_date).toLocaleDateString('en-GB', {
+                            weekday: 'short',
+                            day: 'numeric',
+                            month: 'short',
+                          })}
+                        </p>
+                      </div>
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        batch.status === 'in_progress' 
+                          ? 'bg-warning/10 text-warning' 
+                          : 'bg-secondary text-secondary-foreground'
+                      }`}>
+                        {batch.status.replace('_', ' ')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-center py-6 text-sm">No upcoming batches</p>
+              )}
+            </CardContent>
+          </Card>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const widgetIds = widgets.map((w) => w.id);
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
@@ -112,20 +267,62 @@ export default function Dashboard() {
         
         {/* Quick Actions */}
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => navigate('/batches')} size="sm" className="gap-2">
-            <Plus className="h-4 w-4" />
-            New Batch
+          <Button 
+            onClick={toggleEditMode} 
+            variant={isEditMode ? 'default' : 'outline'} 
+            size="sm" 
+            className="gap-2"
+          >
+            {isEditMode ? (
+              <>
+                <X className="h-4 w-4" />
+                Done Editing
+              </>
+            ) : (
+              <>
+                <Settings2 className="h-4 w-4" />
+                Customize
+              </>
+            )}
           </Button>
-          <Button onClick={() => navigate('/patients')} variant="outline" size="sm" className="gap-2">
-            <Upload className="h-4 w-4" />
-            Upload Patients
-          </Button>
-          <Button onClick={() => navigate('/ai-analytics')} variant="outline" size="sm" className="gap-2">
-            <BarChart3 className="h-4 w-4" />
-            Analytics
-          </Button>
+          {isEditMode && (
+            <Button onClick={resetLayout} variant="ghost" size="sm" className="gap-2">
+              <RotateCcw className="h-4 w-4" />
+              Reset
+            </Button>
+          )}
+          {!isEditMode && (
+            <>
+              <Button onClick={() => navigate('/batches')} size="sm" className="gap-2">
+                <Plus className="h-4 w-4" />
+                New Batch
+              </Button>
+              <Button onClick={() => navigate('/patients')} variant="outline" size="sm" className="gap-2">
+                <Upload className="h-4 w-4" />
+                Upload Patients
+              </Button>
+              <Button onClick={() => navigate('/ai-analytics')} variant="outline" size="sm" className="gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Analytics
+              </Button>
+            </>
+          )}
         </div>
       </div>
+
+      {/* Edit Mode Banner */}
+      {isEditMode && (
+        <div className="p-4 rounded-lg bg-primary/10 border border-primary/20 flex items-center gap-3 animate-fade-in">
+          <Settings2 className="h-5 w-5 text-primary" />
+          <div className="flex-1">
+            <p className="text-sm font-medium">Customization Mode</p>
+            <p className="text-xs text-muted-foreground">
+              Drag widgets to reorder. Click the eye icon to show/hide widgets.
+            </p>
+          </div>
+          <Badge variant="secondary">{widgets.filter(w => w.visible).length} visible</Badge>
+        </div>
+      )}
 
       {/* Stats Grid - Enhanced with gradients and trends */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -227,114 +424,38 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Main Dashboard Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: AI Insights */}
-        <div className="lg:col-span-3 animate-fade-in" style={{ animationDelay: '250ms' }}>
-          <AIInsightsPanel />
-        </div>
-
-        {/* Middle Column: Risk Alerts + QOF */}
-        <div className="lg:col-span-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="animate-fade-in" style={{ animationDelay: '300ms' }}>
-              <RiskAlertsWidget maxItems={4} />
-            </div>
-            <div className="animate-fade-in" style={{ animationDelay: '350ms' }}>
-              <QOFProgressPanel />
-            </div>
+      {/* Draggable Widget Grid */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext items={widgetIds} strategy={rectSortingStrategy}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {widgets.map((widget, index) => (
+              <DraggableWidget
+                key={widget.id}
+                id={widget.id}
+                isEditMode={isEditMode}
+                isVisible={widget.visible}
+                onToggleVisibility={() => toggleWidgetVisibility(widget.id)}
+                className="animate-fade-in"
+              >
+                {renderWidget(widget.id)}
+              </DraggableWidget>
+            ))}
           </div>
-          
-          {/* Recent Activity Row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Recent Calls */}
-            <Card className="animate-fade-in shadow-sm hover:shadow-md transition-shadow" style={{ animationDelay: '400ms' }}>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-primary" />
-                    Recent Calls
-                  </CardTitle>
-                  <Button asChild variant="ghost" size="sm">
-                    <Link to="/calls">View All</Link>
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {recentCalls && recentCalls.length > 0 ? (
-                  <div className="space-y-3">
-                    {recentCalls.slice(0, 4).map((call: any) => (
-                      <div key={call.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
-                        <div className="flex items-center gap-3">
-                          {getStatusIcon(call.status)}
-                          <div>
-                            <p className="text-sm font-medium">{call.patients?.name ?? 'Unknown'}</p>
-                            <p className="text-xs text-muted-foreground">{call.patients?.phone_number}</p>
-                          </div>
-                        </div>
-                        <span className="text-xs text-muted-foreground capitalize px-2 py-1 rounded-full bg-muted">
-                          {call.status.replace('_', ' ')}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground text-center py-6 text-sm">No calls yet</p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Upcoming Batches */}
-            <Card className="animate-fade-in shadow-sm hover:shadow-md transition-shadow" style={{ animationDelay: '450ms' }}>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-primary" />
-                    Upcoming Batches
-                  </CardTitle>
-                  <Button asChild variant="ghost" size="sm">
-                    <Link to="/batches">View All</Link>
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {upcomingBatches && upcomingBatches.length > 0 ? (
-                  <div className="space-y-3">
-                    {upcomingBatches.slice(0, 4).map((batch) => (
-                      <div key={batch.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
-                        <div>
-                          <p className="text-sm font-medium">{batch.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(batch.scheduled_date).toLocaleDateString('en-GB', {
-                              weekday: 'short',
-                              day: 'numeric',
-                              month: 'short',
-                            })}
-                          </p>
-                        </div>
-                        <span className={`text-xs px-2 py-1 rounded-full ${
-                          batch.status === 'in_progress' 
-                            ? 'bg-warning/10 text-warning' 
-                            : 'bg-secondary text-secondary-foreground'
-                        }`}>
-                          {batch.status.replace('_', ' ')}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground text-center py-6 text-sm">No upcoming batches</p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        {/* Right Column: MediTask Widget */}
-        <div className="lg:col-span-3 animate-fade-in" style={{ animationDelay: '500ms' }}>
-          <MediTaskWidget />
-        </div>
-      </div>
+        </SortableContext>
+        
+        <DragOverlay>
+          {activeId ? (
+            <div className="opacity-80 rotate-2 scale-105">
+              {renderWidget(activeId)}
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
     </div>
   );
 }
