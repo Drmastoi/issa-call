@@ -54,10 +54,10 @@ export function AIChatAgent() {
     return (
       <Button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-50"
-        size="icon"
+        className="fixed bottom-6 right-6 h-12 px-4 rounded-full shadow-lg z-50 gap-2"
       >
-        <MessageCircle className="h-6 w-6" />
+        <MessageCircle className="h-5 w-5" />
+        <span className="font-medium">Ask AI</span>
       </Button>
     );
   }
