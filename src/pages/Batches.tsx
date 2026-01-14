@@ -16,6 +16,7 @@ import { Plus, Calendar, Users, Play, Pause, Trash2, Eye, Pencil, X, Search } fr
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useMemo } from 'react';
+import { BatchSummaryView } from '@/components/batch/BatchSummaryView';
 
 interface Batch {
   id: string;
@@ -587,47 +588,23 @@ export default function Batches() {
 
       {/* View Batch Dialog */}
       <Dialog open={!!viewBatchId} onOpenChange={() => setViewBatchId(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>{viewingBatch?.name}</DialogTitle>
             <DialogDescription>
-              Scheduled for {viewingBatch && new Date(viewingBatch.scheduled_date).toLocaleDateString('en-GB')}
+              Scheduled for {viewingBatch && new Date(viewingBatch.scheduled_date).toLocaleDateString('en-GB')} • 
+              Status: {viewingBatch?.status.replace('_', ' ')}
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <h4 className="font-medium mb-3 flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Patients in this batch
-            </h4>
-            {batchPatients && batchPatients.length > 0 ? (
-              <div className="space-y-2">
-                {batchPatients.map((bp: any) => (
-                  <div key={bp.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                    <div>
-                      <p className="font-medium">{bp.patients.name}</p>
-                      <p className="text-sm text-muted-foreground">{bp.patients.phone_number}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline">Priority {bp.priority + 1}</Badge>
-                      {viewingBatch?.status === 'pending' && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => setRemovePatientId(bp.id)}
-                          title="Remove from batch"
-                        >
-                          <X className="h-4 w-4 text-destructive" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-center py-4">No patients in this batch</p>
-            )}
-          </div>
+          {viewBatchId && viewingBatch && (
+            <BatchSummaryView
+              batchId={viewBatchId}
+              batchName={viewingBatch.name}
+              batchStatus={viewingBatch.status}
+              scheduledDate={viewingBatch.scheduled_date}
+              onRemovePatient={(batchPatientId) => setRemovePatientId(batchPatientId)}
+            />
+          )}
         </DialogContent>
       </Dialog>
 
