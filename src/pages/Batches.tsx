@@ -12,9 +12,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Calendar, Users, Play, Pause, Trash2, Eye, Pencil, X } from 'lucide-react';
+import { Plus, Calendar, Users, Play, Pause, Trash2, Eye, Pencil, X, Search } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useMemo } from 'react';
 
 interface Batch {
   id: string;
@@ -42,6 +43,8 @@ export default function Batches() {
   const [editSelectedPatients, setEditSelectedPatients] = useState<string[]>([]);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [removePatientId, setRemovePatientId] = useState<string | null>(null);
+  const [createPatientSearch, setCreatePatientSearch] = useState('');
+  const [editPatientSearch, setEditPatientSearch] = useState('');
   const { user } = useAuth();
   const { logAction } = useAuditLog();
   const { toast } = useToast();
@@ -70,6 +73,28 @@ export default function Batches() {
       return data as Patient[];
     },
   });
+
+  // Filtered patients for create dialog
+  const filteredPatientsCreate = useMemo(() => {
+    if (!patients) return [];
+    if (!createPatientSearch.trim()) return patients;
+    const search = createPatientSearch.toLowerCase();
+    return patients.filter(p => 
+      p.name.toLowerCase().includes(search) || 
+      p.phone_number.includes(search)
+    );
+  }, [patients, createPatientSearch]);
+
+  // Filtered patients for edit dialog
+  const filteredPatientsEdit = useMemo(() => {
+    if (!patients) return [];
+    if (!editPatientSearch.trim()) return patients;
+    const search = editPatientSearch.toLowerCase();
+    return patients.filter(p => 
+      p.name.toLowerCase().includes(search) || 
+      p.phone_number.includes(search)
+    );
+  }, [patients, editPatientSearch]);
 
   const { data: batchPatients, refetch: refetchBatchPatients } = useQuery({
     queryKey: ['batch-patients', viewBatchId],
@@ -379,27 +404,38 @@ export default function Batches() {
                 <div className="space-y-2">
                   <Label>Select Patients ({selectedPatients.length} selected)</Label>
                   <Card>
-                    <div className="p-4 pb-2 border-b">
+                    <div className="p-3 border-b space-y-3">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search patients..."
+                          value={createPatientSearch}
+                          onChange={(e) => setCreatePatientSearch(e.target.value)}
+                          className="pl-9"
+                        />
+                      </div>
                       <div className="flex items-center space-x-3">
                         <Checkbox
                           id="select-all-create"
-                          checked={patients && patients.length > 0 && selectedPatients.length === patients.length}
+                          checked={filteredPatientsCreate.length > 0 && filteredPatientsCreate.every(p => selectedPatients.includes(p.id))}
                           onCheckedChange={(checked) => {
-                            if (checked && patients) {
-                              setSelectedPatients(patients.map(p => p.id));
+                            if (checked) {
+                              const newIds = [...new Set([...selectedPatients, ...filteredPatientsCreate.map(p => p.id)])];
+                              setSelectedPatients(newIds);
                             } else {
-                              setSelectedPatients([]);
+                              const filteredIds = filteredPatientsCreate.map(p => p.id);
+                              setSelectedPatients(selectedPatients.filter(id => !filteredIds.includes(id)));
                             }
                           }}
                         />
-                        <label htmlFor="select-all-create" className="cursor-pointer font-medium">
-                          Select All
+                        <label htmlFor="select-all-create" className="cursor-pointer font-medium text-sm">
+                          Select All {createPatientSearch ? 'Filtered' : ''}
                         </label>
                       </div>
                     </div>
                     <ScrollArea className="h-48">
                       <div className="p-4 space-y-2">
-                        {patients?.map((patient) => (
+                        {filteredPatientsCreate.map((patient) => (
                           <div key={patient.id} className="flex items-center space-x-3 p-2 hover:bg-muted rounded-md">
                             <Checkbox
                               id={patient.id}
@@ -418,6 +454,11 @@ export default function Batches() {
                             </label>
                           </div>
                         ))}
+                        {filteredPatientsCreate.length === 0 && createPatientSearch && (
+                          <p className="text-center text-muted-foreground py-4">
+                            No patients match your search.
+                          </p>
+                        )}
                         {!patients?.length && (
                           <p className="text-center text-muted-foreground py-4">
                             No patients available. Add patients first.
@@ -653,27 +694,38 @@ export default function Batches() {
                 <div className="space-y-2">
                   <Label>Select Patients ({editSelectedPatients.length} selected)</Label>
                   <Card>
-                    <div className="p-4 pb-2 border-b">
+                    <div className="p-3 border-b space-y-3">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search patients..."
+                          value={editPatientSearch}
+                          onChange={(e) => setEditPatientSearch(e.target.value)}
+                          className="pl-9"
+                        />
+                      </div>
                       <div className="flex items-center space-x-3">
                         <Checkbox
                           id="select-all-edit"
-                          checked={patients && patients.length > 0 && editSelectedPatients.length === patients.length}
+                          checked={filteredPatientsEdit.length > 0 && filteredPatientsEdit.every(p => editSelectedPatients.includes(p.id))}
                           onCheckedChange={(checked) => {
-                            if (checked && patients) {
-                              setEditSelectedPatients(patients.map(p => p.id));
+                            if (checked) {
+                              const newIds = [...new Set([...editSelectedPatients, ...filteredPatientsEdit.map(p => p.id)])];
+                              setEditSelectedPatients(newIds);
                             } else {
-                              setEditSelectedPatients([]);
+                              const filteredIds = filteredPatientsEdit.map(p => p.id);
+                              setEditSelectedPatients(editSelectedPatients.filter(id => !filteredIds.includes(id)));
                             }
                           }}
                         />
-                        <label htmlFor="select-all-edit" className="cursor-pointer font-medium">
-                          Select All
+                        <label htmlFor="select-all-edit" className="cursor-pointer font-medium text-sm">
+                          Select All {editPatientSearch ? 'Filtered' : ''}
                         </label>
                       </div>
                     </div>
                     <ScrollArea className="h-48">
                       <div className="p-4 space-y-2">
-                        {patients?.map((patient) => (
+                        {filteredPatientsEdit.map((patient) => (
                           <div key={patient.id} className="flex items-center space-x-3 p-2 hover:bg-muted rounded-md">
                             <Checkbox
                               id={`edit-${patient.id}`}
@@ -692,6 +744,11 @@ export default function Batches() {
                             </label>
                           </div>
                         ))}
+                        {filteredPatientsEdit.length === 0 && editPatientSearch && (
+                          <p className="text-center text-muted-foreground py-4">
+                            No patients match your search.
+                          </p>
+                        )}
                         {!patients?.length && (
                           <p className="text-center text-muted-foreground py-4">
                             No patients available.
