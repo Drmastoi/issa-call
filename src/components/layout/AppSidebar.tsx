@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Calendar, Phone, FileDown, Settings, LogOut, ChevronLeft, ChevronRight, ClipboardList, Brain } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Phone, FileDown, Settings, LogOut, ChevronLeft, ChevronRight, ClipboardList, Brain, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -34,7 +34,7 @@ const navItems = [{
   label: 'Care Home Tasks',
   href: '/meditask'
 }, {
-  icon: Settings,
+  icon: User,
   label: 'Profile',
   href: '/settings'
 }];
