@@ -567,7 +567,7 @@ export default function AIAnalytics() {
               <BarChart3 className="h-8 w-8 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl lg:text-3xl font-bold text-foreground">QOF Analytics</h1>
+              <h1 className="text-2xl lg:text-3xl font-bold text-foreground">AI Analytics</h1>
               <p className="text-muted-foreground">Quality and Outcomes Framework tracking & insights</p>
             </div>
           </div>
