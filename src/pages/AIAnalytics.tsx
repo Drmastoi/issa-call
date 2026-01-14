@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -5,6 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
 import { 
   Brain, 
   ClipboardList, 
@@ -17,7 +21,10 @@ import {
   Activity,
   Target,
   FileWarning,
-  User
+  User,
+  Download,
+  Filter,
+  Search
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -30,7 +37,14 @@ const QOF_INDICATORS = [
   { code: 'AF007', name: 'AF Anticoagulation', target: 85, category: 'AF' },
 ];
 
+type GapFilter = 'all' | 'bp' | 'smoking' | 'no-data';
+type PriorityFilter = 'all' | 'high' | 'medium' | 'normal';
+
 export default function AIAnalytics() {
+  const [gapFilter, setGapFilter] = useState<GapFilter>('all');
+  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
   // Fetch patients
   const { data: patients = [] } = useQuery({
     queryKey: ['analytics-patients'],
@@ -117,29 +131,69 @@ export default function AIAnalytics() {
   const calculateQOFGaps = () => {
     const patientsWithResponses = new Set(callResponses.map(r => r.patient_id));
     
-    // Patients without any call responses
     const missingResponses = patients.filter(p => !patientsWithResponses.has(p.id));
     
-    // Patients missing BP readings
     const missingBP = patients.filter(p => {
       const responses = callResponses.filter(r => r.patient_id === p.id);
       return responses.length === 0 || !responses.some(r => r.blood_pressure_systolic && r.blood_pressure_diastolic);
     });
 
-    // Patients missing smoking status
     const missingSmoking = patients.filter(p => {
       const responses = callResponses.filter(r => r.patient_id === p.id);
       return responses.length === 0 || !responses.some(r => r.smoking_status);
     });
 
-    return {
-      missingResponses,
-      missingBP,
-      missingSmoking,
-    };
+    return { missingResponses, missingBP, missingSmoking };
   };
 
   const qofGaps = calculateQOFGaps();
+
+  // Filter patients by search and gap type
+  const getFilteredGapPatients = () => {
+    let filteredPatients: typeof patients = [];
+    
+    switch (gapFilter) {
+      case 'bp':
+        filteredPatients = qofGaps.missingBP;
+        break;
+      case 'smoking':
+        filteredPatients = qofGaps.missingSmoking;
+        break;
+      case 'no-data':
+        filteredPatients = qofGaps.missingResponses;
+        break;
+      default:
+        // Combine all unique patients with gaps
+        const allGapPatientIds = new Set([
+          ...qofGaps.missingBP.map(p => p.id),
+          ...qofGaps.missingSmoking.map(p => p.id),
+          ...qofGaps.missingResponses.map(p => p.id),
+        ]);
+        filteredPatients = patients.filter(p => allGapPatientIds.has(p.id));
+    }
+
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filteredPatients = filteredPatients.filter(p => 
+        p.name.toLowerCase().includes(query) || 
+        p.nhs_number?.toLowerCase().includes(query)
+      );
+    }
+
+    return filteredPatients;
+  };
+
+  // Filter tasks by priority
+  const getFilteredTasks = () => {
+    let filtered = pendingTasks;
+    if (priorityFilter !== 'all') {
+      filtered = filtered.filter(t => t.priority === priorityFilter);
+    }
+    return filtered;
+  };
+
+  const filteredGapPatients = getFilteredGapPatients();
+  const filteredTasks = getFilteredTasks();
 
   // Calculate KPIs
   const kpis = {
@@ -154,9 +208,8 @@ export default function AIAnalytics() {
       : 0,
   };
 
-  // Calculate simulated QOF progress
+  // Calculate QOF progress
   const qofProgress = QOF_INDICATORS.map(indicator => {
-    // Simulate achievement based on call response data
     let achieved = 0;
     if (indicator.code === 'BP002') {
       achieved = callResponses.filter(r => r.blood_pressure_systolic && r.blood_pressure_diastolic).length;
@@ -174,6 +227,81 @@ export default function AIAnalytics() {
       gap: indicator.target - percentage,
     };
   });
+
+  // Export functions
+  const exportToCSV = (data: any[], filename: string, headers: string[]) => {
+    const csvContent = [
+      headers.join(','),
+      ...data.map(row => headers.map(h => {
+        const value = row[h.toLowerCase().replace(/ /g, '_')] ?? '';
+        return `"${String(value).replace(/"/g, '""')}"`;
+      }).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${filename}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    toast.success(`Exported ${data.length} records to ${filename}.csv`);
+  };
+
+  const exportQOFGaps = () => {
+    const data = filteredGapPatients.map(p => {
+      const hasBP = !qofGaps.missingBP.some(bp => bp.id === p.id);
+      const hasSmoking = !qofGaps.missingSmoking.some(s => s.id === p.id);
+      const hasData = !qofGaps.missingResponses.some(r => r.id === p.id);
+      return {
+        name: p.name,
+        nhs_number: p.nhs_number || '',
+        phone_number: p.phone_number,
+        has_bp: hasBP ? 'Yes' : 'No',
+        has_smoking: hasSmoking ? 'Yes' : 'No',
+        has_call_data: hasData ? 'Yes' : 'No',
+      };
+    });
+    exportToCSV(data, 'qof_gaps', ['Name', 'NHS_Number', 'Phone_Number', 'Has_BP', 'Has_Smoking', 'Has_Call_Data']);
+  };
+
+  const exportTasks = () => {
+    const data = filteredTasks.map((t: any) => ({
+      title: t.title,
+      priority: t.priority,
+      status: t.status,
+      due_date: t.due_date ? new Date(t.due_date).toLocaleDateString() : '',
+      patient_name: t.patients?.name || '',
+    }));
+    exportToCSV(data, 'pending_tasks', ['Title', 'Priority', 'Status', 'Due_Date', 'Patient_Name']);
+  };
+
+  const exportQOFProgress = () => {
+    const data = qofProgress.map(q => ({
+      code: q.code,
+      name: q.name,
+      category: q.category,
+      target: `${q.target}%`,
+      achieved: `${q.percentage}%`,
+      gap: q.gap > 0 ? `${q.gap}%` : 'Met',
+      patients_needed: q.gap > 0 ? Math.ceil((q.gap / 100) * patients.length) : 0,
+    }));
+    exportToCSV(data, 'qof_progress', ['Code', 'Name', 'Category', 'Target', 'Achieved', 'Gap', 'Patients_Needed']);
+  };
+
+  const exportFullReport = () => {
+    // Export comprehensive analytics report
+    const summary = [
+      { metric: 'Total Patients', value: kpis.totalPatients },
+      { metric: 'Patients With Data', value: kpis.patientsWithData },
+      { metric: 'Data Completeness', value: `${kpis.dataCompleteness}%` },
+      { metric: 'Pending Tasks', value: kpis.pendingTasksCount },
+      { metric: 'High Priority Tasks', value: kpis.highPriorityTasks },
+      { metric: 'Unresolved Alerts', value: kpis.unresolvedAlerts },
+      { metric: 'Missing BP Records', value: qofGaps.missingBP.length },
+      { metric: 'Missing Smoking Status', value: qofGaps.missingSmoking.length },
+      { metric: 'No Call Data', value: qofGaps.missingResponses.length },
+    ];
+    exportToCSV(summary, 'analytics_summary', ['Metric', 'Value']);
+  };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -193,14 +321,30 @@ export default function AIAnalytics() {
 
   return (
     <div className="p-8 space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-primary/10 rounded-lg">
-          <Brain className="h-6 w-6 text-primary" />
+      {/* Header with Export Buttons */}
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <Brain className="h-6 w-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">AI Analytics</h1>
+            <p className="text-muted-foreground">Comprehensive insights, QOF tracking, and patient analytics</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">AI Analytics</h1>
-          <p className="text-muted-foreground">Comprehensive insights, QOF tracking, and patient analytics</p>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={exportFullReport}>
+            <Download className="h-4 w-4 mr-2" />
+            Summary
+          </Button>
+          <Button variant="outline" size="sm" onClick={exportQOFProgress}>
+            <Download className="h-4 w-4 mr-2" />
+            QOF Report
+          </Button>
+          <Button variant="outline" size="sm" onClick={exportQOFGaps}>
+            <Download className="h-4 w-4 mr-2" />
+            Gaps List
+          </Button>
         </div>
       </div>
 
@@ -309,17 +453,38 @@ export default function AIAnalytics() {
         {/* Pending Tasks */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ClipboardList className="h-5 w-5 text-primary" />
-              Pending Tasks
-            </CardTitle>
-            <CardDescription>{pendingTasks.length} tasks awaiting action</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <ClipboardList className="h-5 w-5 text-primary" />
+                  Pending Tasks
+                </CardTitle>
+                <CardDescription>{filteredTasks.length} tasks awaiting action</CardDescription>
+              </div>
+              <Button variant="ghost" size="sm" onClick={exportTasks}>
+                <Download className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex items-center gap-2 mt-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select value={priorityFilter} onValueChange={(v) => setPriorityFilter(v as PriorityFilter)}>
+                <SelectTrigger className="h-8 w-[130px]">
+                  <SelectValue placeholder="Priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Priorities</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="normal">Normal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[300px]">
-              {pendingTasks.length > 0 ? (
+            <ScrollArea className="h-[280px]">
+              {filteredTasks.length > 0 ? (
                 <div className="space-y-3">
-                  {pendingTasks.slice(0, 10).map((task: any) => (
+                  {filteredTasks.slice(0, 10).map((task: any) => (
                     <div key={task.id} className="p-3 border rounded-lg space-y-2">
                       <div className="flex items-start justify-between gap-2">
                         <span className="font-medium text-sm line-clamp-1">{task.title}</span>
@@ -361,95 +526,89 @@ export default function AIAnalytics() {
         </Card>
       </div>
 
-      {/* QOF Gaps - Patients needing attention */}
+      {/* QOF Gaps - Patients needing attention with Filters */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-warning" />
-            QOF Gaps - Patients Requiring Action
-          </CardTitle>
-          <CardDescription>Patients missing key health data for QOF compliance</CardDescription>
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-warning" />
+                QOF Gaps - Patients Requiring Action
+              </CardTitle>
+              <CardDescription>Patients missing key health data for QOF compliance</CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={exportQOFGaps}>
+              <Download className="h-4 w-4 mr-2" />
+              Export Filtered
+            </Button>
+          </div>
+          {/* Filters */}
+          <div className="flex items-center gap-4 mt-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select value={gapFilter} onValueChange={(v) => setGapFilter(v as GapFilter)}>
+                <SelectTrigger className="h-8 w-[180px]">
+                  <SelectValue placeholder="Filter by gap type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Gaps ({filteredGapPatients.length})</SelectItem>
+                  <SelectItem value="bp">Missing BP ({qofGaps.missingBP.length})</SelectItem>
+                  <SelectItem value="smoking">Missing Smoking ({qofGaps.missingSmoking.length})</SelectItem>
+                  <SelectItem value="no-data">No Call Data ({qofGaps.missingResponses.length})</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="relative flex-1 max-w-xs">
+              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search patients..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 h-8"
+              />
+            </div>
+            <Badge variant="secondary">{filteredGapPatients.length} patients</Badge>
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Missing BP */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="font-medium text-sm">Missing Blood Pressure</h4>
-                <Badge variant="outline">{qofGaps.missingBP.length}</Badge>
+          <ScrollArea className="h-[300px]">
+            {filteredGapPatients.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {filteredGapPatients.map((patient) => {
+                  const missingItems = [];
+                  if (qofGaps.missingBP.some(p => p.id === patient.id)) missingItems.push('BP');
+                  if (qofGaps.missingSmoking.some(p => p.id === patient.id)) missingItems.push('Smoking');
+                  if (qofGaps.missingResponses.some(p => p.id === patient.id)) missingItems.push('No Data');
+                  
+                  return (
+                    <Link
+                      key={patient.id}
+                      to={`/patients?search=${encodeURIComponent(patient.name)}`}
+                      className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted transition-colors"
+                    >
+                      <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{patient.name}</p>
+                        <p className="text-xs text-muted-foreground">{patient.nhs_number}</p>
+                        <div className="flex gap-1 mt-1 flex-wrap">
+                          {missingItems.map(item => (
+                            <Badge key={item} variant="outline" className="text-xs px-1 py-0">
+                              {item}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
               </div>
-              <ScrollArea className="h-[200px] border rounded-lg p-2">
-                {qofGaps.missingBP.slice(0, 20).map((patient) => (
-                  <Link
-                    key={patient.id}
-                    to={`/patients?search=${encodeURIComponent(patient.name)}`}
-                    className="flex items-center gap-2 p-2 hover:bg-muted rounded-md transition-colors"
-                  >
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{patient.name}</p>
-                      <p className="text-xs text-muted-foreground">{patient.nhs_number}</p>
-                    </div>
-                  </Link>
-                ))}
-                {qofGaps.missingBP.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-4">All patients have BP data</p>
-                )}
-              </ScrollArea>
-            </div>
-
-            {/* Missing Smoking Status */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="font-medium text-sm">Missing Smoking Status</h4>
-                <Badge variant="outline">{qofGaps.missingSmoking.length}</Badge>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-8">
+                <CheckCircle2 className="h-8 w-8 mb-2" />
+                <p>No patients match the current filters</p>
               </div>
-              <ScrollArea className="h-[200px] border rounded-lg p-2">
-                {qofGaps.missingSmoking.slice(0, 20).map((patient) => (
-                  <Link
-                    key={patient.id}
-                    to={`/patients?search=${encodeURIComponent(patient.name)}`}
-                    className="flex items-center gap-2 p-2 hover:bg-muted rounded-md transition-colors"
-                  >
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{patient.name}</p>
-                      <p className="text-xs text-muted-foreground">{patient.nhs_number}</p>
-                    </div>
-                  </Link>
-                ))}
-                {qofGaps.missingSmoking.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-4">All patients have smoking data</p>
-                )}
-              </ScrollArea>
-            </div>
-
-            {/* No Response Data */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="font-medium text-sm">No Call Data</h4>
-                <Badge variant="outline">{qofGaps.missingResponses.length}</Badge>
-              </div>
-              <ScrollArea className="h-[200px] border rounded-lg p-2">
-                {qofGaps.missingResponses.slice(0, 20).map((patient) => (
-                  <Link
-                    key={patient.id}
-                    to={`/patients?search=${encodeURIComponent(patient.name)}`}
-                    className="flex items-center gap-2 p-2 hover:bg-muted rounded-md transition-colors"
-                  >
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{patient.name}</p>
-                      <p className="text-xs text-muted-foreground">{patient.nhs_number}</p>
-                    </div>
-                  </Link>
-                ))}
-                {qofGaps.missingResponses.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-4">All patients have call data</p>
-                )}
-              </ScrollArea>
-            </div>
-          </div>
+            )}
+          </ScrollArea>
         </CardContent>
       </Card>
 
