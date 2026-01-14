@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.extract-patient-from-pdf]
 verify_jwt = false
+
+[functions.ai-chat-agent]
+verify_jwt = false
