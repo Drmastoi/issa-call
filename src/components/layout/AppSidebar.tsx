@@ -31,7 +31,7 @@ const navItems = [{
   href: '/export'
 }, {
   icon: ClipboardList,
-  label: 'MediTask',
+  label: 'Care Home Tasks',
   href: '/meditask'
 }, {
   icon: Settings,
