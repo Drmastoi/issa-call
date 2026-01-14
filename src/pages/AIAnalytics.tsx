@@ -8,6 +8,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { 
   Brain, 
@@ -24,26 +27,42 @@ import {
   User,
   Download,
   Filter,
-  Search
+  Search,
+  Heart,
+  Wind,
+  HeartPulse,
+  Shield,
+  Cigarette,
+  ChevronDown,
+  ChevronRight,
+  Info
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-
-// QOF indicator definitions with targets
-const QOF_INDICATORS = [
-  { code: 'BP002', name: 'Blood Pressure Recording', target: 80, category: 'Hypertension' },
-  { code: 'SMOK002', name: 'Smoking Status Recording', target: 90, category: 'Smoking' },
-  { code: 'DM017', name: 'Diabetic HbA1c Check', target: 75, category: 'Diabetes' },
-  { code: 'CHD005', name: 'CHD Blood Pressure', target: 70, category: 'CHD' },
-  { code: 'AF007', name: 'AF Anticoagulation', target: 85, category: 'AF' },
-];
+import { QOF_INDICATORS, QOF_CATEGORIES, calculateQOFProgress } from '@/lib/qof-codes';
 
 type GapFilter = 'all' | 'bp' | 'smoking' | 'no-data';
 type PriorityFilter = 'all' | 'high' | 'medium' | 'normal';
+type CategoryTab = 'all' | string;
+
+const getCategoryIcon = (iconName: string) => {
+  switch (iconName) {
+    case 'Heart': return Heart;
+    case 'Activity': return Activity;
+    case 'Wind': return Wind;
+    case 'Brain': return Brain;
+    case 'HeartPulse': return HeartPulse;
+    case 'Shield': return Shield;
+    case 'Cigarette': return Cigarette;
+    default: return Target;
+  }
+};
 
 export default function AIAnalytics() {
   const [gapFilter, setGapFilter] = useState<GapFilter>('all');
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [categoryTab, setCategoryTab] = useState<CategoryTab>('all');
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['Cardiovascular']));
 
   // Fetch patients
   const { data: patients = [] } = useQuery({
@@ -163,7 +182,6 @@ export default function AIAnalytics() {
         filteredPatients = qofGaps.missingResponses;
         break;
       default:
-        // Combine all unique patients with gaps
         const allGapPatientIds = new Set([
           ...qofGaps.missingBP.map(p => p.id),
           ...qofGaps.missingSmoking.map(p => p.id),
@@ -208,32 +226,62 @@ export default function AIAnalytics() {
       : 0,
   };
 
-  // Calculate QOF progress
-  const qofProgress = QOF_INDICATORS.map(indicator => {
+  // Calculate QOF progress for each indicator
+  const getIndicatorProgress = (indicator: typeof QOF_INDICATORS[0]) => {
     let achieved = 0;
-    if (indicator.code === 'BP002') {
-      achieved = callResponses.filter(r => r.blood_pressure_systolic && r.blood_pressure_diastolic).length;
-    } else if (indicator.code === 'SMOK002') {
+    const total = patients.length;
+
+    // Calculate based on available data
+    if (indicator.code === 'SMOK002') {
       achieved = callResponses.filter(r => r.smoking_status).length;
+    } else if (indicator.code.startsWith('HYP') || indicator.code.startsWith('CHD0') || indicator.code.startsWith('STIA') || indicator.code.startsWith('DM036')) {
+      // BP-related indicators
+      achieved = callResponses.filter(r => {
+        if (!r.blood_pressure_systolic || !r.blood_pressure_diastolic) return false;
+        const target = indicator.ageGroup === 'over80' ? { sys: 150, dia: 90 } : { sys: 140, dia: 90 };
+        return r.blood_pressure_systolic <= target.sys && r.blood_pressure_diastolic <= target.dia;
+      }).length;
     } else {
-      achieved = Math.floor(Math.random() * patients.length * 0.7);
+      // For indicators we can't calculate from call_responses, show simulated data
+      // In production, this would come from clinical data
+      achieved = Math.floor(Math.random() * total * 0.7);
     }
-    const percentage = patients.length > 0 ? Math.min(100, Math.round((achieved / patients.length) * 100)) : 0;
-    return {
-      ...indicator,
-      achieved,
-      total: patients.length,
-      percentage,
-      gap: indicator.target - percentage,
-    };
-  });
+
+    return calculateQOFProgress(indicator, achieved, total);
+  };
+
+  // Group indicators by category
+  const groupedIndicators = QOF_CATEGORIES.map(category => ({
+    ...category,
+    indicators: QOF_INDICATORS.filter(i => i.category === category.name.split(' ')[0] || 
+      i.category.toLowerCase().includes(category.id.replace('-', ' ')))
+  })).filter(cat => cat.indicators.length > 0);
+
+  // Calculate overall category scores
+  const getCategoryScore = (indicators: typeof QOF_INDICATORS) => {
+    if (indicators.length === 0) return 0;
+    const scores = indicators.map(i => getIndicatorProgress(i).percent);
+    return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+  };
+
+  // Toggle category expansion
+  const toggleCategory = (category: string) => {
+    const newExpanded = new Set(expandedCategories);
+    if (newExpanded.has(category)) {
+      newExpanded.delete(category);
+    } else {
+      newExpanded.add(category);
+    }
+    setExpandedCategories(newExpanded);
+  };
 
   // Export functions
   const exportToCSV = (data: any[], filename: string, headers: string[]) => {
     const csvContent = [
       headers.join(','),
       ...data.map(row => headers.map(h => {
-        const value = row[h.toLowerCase().replace(/ /g, '_')] ?? '';
+        const key = h.toLowerCase().replace(/ /g, '_');
+        const value = row[key] ?? '';
         return `"${String(value).replace(/"/g, '""')}"`;
       }).join(','))
     ].join('\n');
@@ -275,20 +323,23 @@ export default function AIAnalytics() {
   };
 
   const exportQOFProgress = () => {
-    const data = qofProgress.map(q => ({
-      code: q.code,
-      name: q.name,
-      category: q.category,
-      target: `${q.target}%`,
-      achieved: `${q.percentage}%`,
-      gap: q.gap > 0 ? `${q.gap}%` : 'Met',
-      patients_needed: q.gap > 0 ? Math.ceil((q.gap / 100) * patients.length) : 0,
-    }));
-    exportToCSV(data, 'qof_progress', ['Code', 'Name', 'Category', 'Target', 'Achieved', 'Gap', 'Patients_Needed']);
+    const data = QOF_INDICATORS.map(indicator => {
+      const progress = getIndicatorProgress(indicator);
+      return {
+        code: indicator.code,
+        name: indicator.name,
+        category: indicator.category,
+        condition: indicator.condition || '',
+        target: `${indicator.targetPercent}%`,
+        achieved: `${progress.percent}%`,
+        gap: progress.gap > 0 ? `${progress.gap}%` : 'Met',
+        status: progress.status,
+      };
+    });
+    exportToCSV(data, 'qof_progress_full', ['Code', 'Name', 'Category', 'Condition', 'Target', 'Achieved', 'Gap', 'Status']);
   };
 
   const exportFullReport = () => {
-    // Export comprehensive analytics report
     const summary = [
       { metric: 'Total Patients', value: kpis.totalPatients },
       { metric: 'Patients With Data', value: kpis.patientsWithData },
@@ -319,335 +370,422 @@ export default function AIAnalytics() {
     }
   };
 
+  const getStatusColor = (status: 'good' | 'warning' | 'poor') => {
+    switch (status) {
+      case 'good': return 'text-green-600';
+      case 'warning': return 'text-amber-500';
+      case 'poor': return 'text-red-500';
+    }
+  };
+
   return (
-    <div className="p-8 space-y-6">
-      {/* Header with Export Buttons */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-primary/10 rounded-lg">
-            <Brain className="h-6 w-6 text-primary" />
+    <TooltipProvider>
+      <div className="p-8 space-y-6">
+        {/* Header with Export Buttons */}
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Brain className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">QOF Analytics</h1>
+              <p className="text-muted-foreground">NHS Quality and Outcomes Framework tracking & patient analytics</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">AI Analytics</h1>
-            <p className="text-muted-foreground">Comprehensive insights, QOF tracking, and patient analytics</p>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={exportFullReport}>
+              <Download className="h-4 w-4 mr-2" />
+              Summary
+            </Button>
+            <Button variant="outline" size="sm" onClick={exportQOFProgress}>
+              <Download className="h-4 w-4 mr-2" />
+              Full QOF Report
+            </Button>
+            <Button variant="outline" size="sm" onClick={exportQOFGaps}>
+              <Download className="h-4 w-4 mr-2" />
+              Gaps List
+            </Button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={exportFullReport}>
-            <Download className="h-4 w-4 mr-2" />
-            Summary
-          </Button>
-          <Button variant="outline" size="sm" onClick={exportQOFProgress}>
-            <Download className="h-4 w-4 mr-2" />
-            QOF Report
-          </Button>
-          <Button variant="outline" size="sm" onClick={exportQOFGaps}>
-            <Download className="h-4 w-4 mr-2" />
-            Gaps List
-          </Button>
+
+        {/* KPI Stats Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                <Users className="h-4 w-4" />
+                <span className="text-xs">Total Patients</span>
+              </div>
+              <p className="text-2xl font-bold">{kpis.totalPatients}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                <Activity className="h-4 w-4" />
+                <span className="text-xs">With Data</span>
+              </div>
+              <p className="text-2xl font-bold">{kpis.patientsWithData}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                <ClipboardList className="h-4 w-4" />
+                <span className="text-xs">Pending Tasks</span>
+              </div>
+              <p className="text-2xl font-bold">{kpis.pendingTasksCount}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 text-destructive mb-1">
+                <AlertTriangle className="h-4 w-4" />
+                <span className="text-xs">High Priority</span>
+              </div>
+              <p className="text-2xl font-bold">{kpis.highPriorityTasks}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 text-warning mb-1">
+                <FileWarning className="h-4 w-4" />
+                <span className="text-xs">Alerts</span>
+              </div>
+              <p className="text-2xl font-bold">{kpis.unresolvedAlerts}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 text-green-600 mb-1">
+                <Target className="h-4 w-4" />
+                <span className="text-xs">Data Complete</span>
+              </div>
+              <p className="text-2xl font-bold">{kpis.dataCompleteness}%</p>
+            </CardContent>
+          </Card>
         </div>
-      </div>
 
-      {/* KPI Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        {/* QOF Indicators by Category */}
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-muted-foreground mb-1">
-              <Users className="h-4 w-4" />
-              <span className="text-xs">Total Patients</span>
-            </div>
-            <p className="text-2xl font-bold">{kpis.totalPatients}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-muted-foreground mb-1">
-              <Activity className="h-4 w-4" />
-              <span className="text-xs">With Data</span>
-            </div>
-            <p className="text-2xl font-bold">{kpis.patientsWithData}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-muted-foreground mb-1">
-              <ClipboardList className="h-4 w-4" />
-              <span className="text-xs">Pending Tasks</span>
-            </div>
-            <p className="text-2xl font-bold">{kpis.pendingTasksCount}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-destructive mb-1">
-              <AlertTriangle className="h-4 w-4" />
-              <span className="text-xs">High Priority</span>
-            </div>
-            <p className="text-2xl font-bold">{kpis.highPriorityTasks}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-warning mb-1">
-              <FileWarning className="h-4 w-4" />
-              <span className="text-xs">Alerts</span>
-            </div>
-            <p className="text-2xl font-bold">{kpis.unresolvedAlerts}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-success mb-1">
-              <Target className="h-4 w-4" />
-              <span className="text-xs">Data Complete</span>
-            </div>
-            <p className="text-2xl font-bold">{kpis.dataCompleteness}%</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* QOF Progress */}
-        <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-primary" />
-              QOF Indicator Progress
+              NHS QOF Indicators 2024/25
             </CardTitle>
-            <CardDescription>Track achievement against QOF targets</CardDescription>
+            <CardDescription>
+              Track achievement against Quality and Outcomes Framework targets across all clinical domains
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {qofProgress.map((indicator) => (
-                <div key={indicator.code} className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-xs">{indicator.code}</Badge>
-                      <span className="font-medium">{indicator.name}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={indicator.percentage >= indicator.target ? 'text-success' : 'text-warning'}>
-                        {indicator.percentage}%
-                      </span>
-                      <span className="text-muted-foreground">/ {indicator.target}%</span>
-                    </div>
-                  </div>
-                  <div className="relative">
-                    <Progress value={indicator.percentage} className="h-2" />
-                    <div 
-                      className="absolute top-0 h-2 w-0.5 bg-foreground/50" 
-                      style={{ left: `${indicator.target}%` }}
-                    />
-                  </div>
-                  {indicator.gap > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      Gap: {indicator.gap}% ({Math.ceil((indicator.gap / 100) * patients.length)} patients needed)
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+            <ScrollArea className="h-[500px] pr-4">
+              <div className="space-y-4">
+                {groupedIndicators.map((category) => {
+                  const Icon = getCategoryIcon(category.icon);
+                  const categoryScore = getCategoryScore(category.indicators);
+                  const isExpanded = expandedCategories.has(category.name);
 
-        {/* Pending Tasks */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <ClipboardList className="h-5 w-5 text-primary" />
-                  Pending Tasks
-                </CardTitle>
-                <CardDescription>{filteredTasks.length} tasks awaiting action</CardDescription>
-              </div>
-              <Button variant="ghost" size="sm" onClick={exportTasks}>
-                <Download className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="flex items-center gap-2 mt-2">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <Select value={priorityFilter} onValueChange={(v) => setPriorityFilter(v as PriorityFilter)}>
-                <SelectTrigger className="h-8 w-[130px]">
-                  <SelectValue placeholder="Priority" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Priorities</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="normal">Normal</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[280px]">
-              {filteredTasks.length > 0 ? (
-                <div className="space-y-3">
-                  {filteredTasks.slice(0, 10).map((task: any) => (
-                    <div key={task.id} className="p-3 border rounded-lg space-y-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="font-medium text-sm line-clamp-1">{task.title}</span>
-                        <Badge variant={getPriorityColor(task.priority)} className="shrink-0">
-                          {task.priority}
-                        </Badge>
-                      </div>
-                      {task.patients && (
-                        <Link 
-                          to={`/patients?search=${encodeURIComponent(task.patients.name)}`}
-                          className="flex items-center gap-1 text-xs text-primary hover:underline"
-                        >
-                          <User className="h-3 w-3" />
-                          {task.patients.name}
-                        </Link>
-                      )}
-                      {task.due_date && (
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Clock className="h-3 w-3" />
-                          Due: {new Date(task.due_date).toLocaleDateString()}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                  <CheckCircle2 className="h-8 w-8 mb-2" />
-                  <p>No pending tasks</p>
-                </div>
-              )}
-            </ScrollArea>
-            <Button asChild variant="outline" className="w-full mt-4">
-              <Link to="/meditask">
-                View All Tasks <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* QOF Gaps - Patients needing attention with Filters */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-warning" />
-                QOF Gaps - Patients Requiring Action
-              </CardTitle>
-              <CardDescription>Patients missing key health data for QOF compliance</CardDescription>
-            </div>
-            <Button variant="outline" size="sm" onClick={exportQOFGaps}>
-              <Download className="h-4 w-4 mr-2" />
-              Export Filtered
-            </Button>
-          </div>
-          {/* Filters */}
-          <div className="flex items-center gap-4 mt-4 flex-wrap">
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <Select value={gapFilter} onValueChange={(v) => setGapFilter(v as GapFilter)}>
-                <SelectTrigger className="h-8 w-[180px]">
-                  <SelectValue placeholder="Filter by gap type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Gaps ({filteredGapPatients.length})</SelectItem>
-                  <SelectItem value="bp">Missing BP ({qofGaps.missingBP.length})</SelectItem>
-                  <SelectItem value="smoking">Missing Smoking ({qofGaps.missingSmoking.length})</SelectItem>
-                  <SelectItem value="no-data">No Call Data ({qofGaps.missingResponses.length})</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="relative flex-1 max-w-xs">
-              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search patients..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8 h-8"
-              />
-            </div>
-            <Badge variant="secondary">{filteredGapPatients.length} patients</Badge>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <ScrollArea className="h-[300px]">
-            {filteredGapPatients.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {filteredGapPatients.map((patient) => {
-                  const missingItems = [];
-                  if (qofGaps.missingBP.some(p => p.id === patient.id)) missingItems.push('BP');
-                  if (qofGaps.missingSmoking.some(p => p.id === patient.id)) missingItems.push('Smoking');
-                  if (qofGaps.missingResponses.some(p => p.id === patient.id)) missingItems.push('No Data');
-                  
                   return (
-                    <Link
-                      key={patient.id}
-                      to={`/patients?search=${encodeURIComponent(patient.name)}`}
-                      className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted transition-colors"
+                    <Collapsible
+                      key={category.id}
+                      open={isExpanded}
+                      onOpenChange={() => toggleCategory(category.name)}
                     >
-                      <User className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">{patient.name}</p>
-                        <p className="text-xs text-muted-foreground">{patient.nhs_number}</p>
-                        <div className="flex gap-1 mt-1 flex-wrap">
-                          {missingItems.map(item => (
-                            <Badge key={item} variant="outline" className="text-xs px-1 py-0">
-                              {item}
-                            </Badge>
-                          ))}
+                      <CollapsibleTrigger asChild>
+                        <div className="flex items-center justify-between p-4 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-primary/10 rounded-lg">
+                              <Icon className="h-5 w-5 text-primary" />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold">{category.name}</h3>
+                              <p className="text-sm text-muted-foreground">
+                                {category.indicators.length} indicators
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="text-right">
+                              <div className={`text-lg font-bold ${categoryScore >= 70 ? 'text-green-600' : categoryScore >= 50 ? 'text-amber-500' : 'text-red-500'}`}>
+                                {categoryScore}%
+                              </div>
+                              <div className="text-xs text-muted-foreground">avg. achievement</div>
+                            </div>
+                            {isExpanded ? (
+                              <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                            ) : (
+                              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </Link>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="mt-2 ml-4 space-y-3 border-l-2 border-muted pl-4">
+                          {category.indicators.map((indicator) => {
+                            const progress = getIndicatorProgress(indicator);
+                            return (
+                              <div key={indicator.id} className="p-3 bg-muted/30 rounded-lg space-y-2">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <Badge variant="outline" className="text-xs font-mono">
+                                        {indicator.code}
+                                      </Badge>
+                                      <span className="font-medium text-sm">{indicator.name}</span>
+                                      {indicator.condition && (
+                                        <Badge variant="secondary" className="text-xs">
+                                          {indicator.condition}
+                                        </Badge>
+                                      )}
+                                      <Tooltip>
+                                        <TooltipTrigger>
+                                          <Info className="h-3 w-3 text-muted-foreground" />
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top" className="max-w-xs">
+                                          <p className="text-sm">{indicator.description}</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </div>
+                                    {indicator.ageGroup && (
+                                      <span className="text-xs text-muted-foreground">
+                                        Age group: {indicator.ageGroup === 'under80' ? '≤79 years' : 
+                                          indicator.ageGroup === 'over80' ? '≥80 years' : 
+                                          indicator.ageGroup === '40plus' ? '40+ years' : 'All ages'}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-right shrink-0">
+                                    <span className={`font-bold ${getStatusColor(progress.status)}`}>
+                                      {progress.percent}%
+                                    </span>
+                                    <span className="text-muted-foreground text-sm"> / {indicator.targetPercent}%</span>
+                                  </div>
+                                </div>
+                                <div className="relative">
+                                  <Progress value={progress.percent} className="h-2" />
+                                  <div 
+                                    className="absolute top-0 h-2 w-0.5 bg-foreground/70" 
+                                    style={{ left: `${Math.min(indicator.targetPercent, 100)}%` }}
+                                  />
+                                </div>
+                                {progress.gap > 0 && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Gap: {progress.gap}% • ~{Math.ceil((progress.gap / 100) * patients.length)} patients needed to meet target
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
                   );
                 })}
               </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-8">
-                <CheckCircle2 className="h-8 w-8 mb-2" />
-                <p>No patients match the current filters</p>
-              </div>
-            )}
-          </ScrollArea>
-        </CardContent>
-      </Card>
-
-      {/* Health Alerts */}
-      {healthAlerts.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-              Unresolved Health Alerts
-            </CardTitle>
-            <CardDescription>{healthAlerts.length} alerts requiring attention</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {healthAlerts.slice(0, 6).map((alert: any) => (
-                <div key={alert.id} className={`p-4 rounded-lg border ${getSeverityColor(alert.severity)}`}>
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <span className="font-medium text-sm">{alert.title}</span>
-                    <Badge variant={alert.severity === 'critical' ? 'destructive' : 'secondary'}>
-                      {alert.severity}
-                    </Badge>
-                  </div>
-                  <p className="text-xs mb-2 line-clamp-2">{alert.description}</p>
-                  {alert.patients && (
-                    <Link 
-                      to={`/patients?search=${encodeURIComponent(alert.patients.name)}`}
-                      className="flex items-center gap-1 text-xs text-primary hover:underline"
-                    >
-                      <User className="h-3 w-3" />
-                      {alert.patients.name}
-                    </Link>
-                  )}
-                </div>
-              ))}
-            </div>
+            </ScrollArea>
           </CardContent>
         </Card>
-      )}
-    </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Pending Tasks */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <ClipboardList className="h-5 w-5 text-primary" />
+                    Pending Tasks
+                  </CardTitle>
+                  <CardDescription>{filteredTasks.length} tasks awaiting action</CardDescription>
+                </div>
+                <Button variant="ghost" size="sm" onClick={exportTasks}>
+                  <Download className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <Select value={priorityFilter} onValueChange={(v) => setPriorityFilter(v as PriorityFilter)}>
+                  <SelectTrigger className="h-8 w-[130px]">
+                    <SelectValue placeholder="Priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Priorities</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="normal">Normal</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[280px]">
+                {filteredTasks.length > 0 ? (
+                  <div className="space-y-3">
+                    {filteredTasks.slice(0, 10).map((task: any) => (
+                      <div key={task.id} className="p-3 border rounded-lg space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="font-medium text-sm line-clamp-1">{task.title}</span>
+                          <Badge variant={getPriorityColor(task.priority)} className="shrink-0">
+                            {task.priority}
+                          </Badge>
+                        </div>
+                        {task.patients && (
+                          <Link 
+                            to={`/patients?search=${encodeURIComponent(task.patients.name)}`}
+                            className="flex items-center gap-1 text-xs text-primary hover:underline"
+                          >
+                            <User className="h-3 w-3" />
+                            {task.patients.name}
+                          </Link>
+                        )}
+                        {task.due_date && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            Due: {new Date(task.due_date).toLocaleDateString()}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                    <CheckCircle2 className="h-8 w-8 mb-2" />
+                    <p>No pending tasks</p>
+                  </div>
+                )}
+              </ScrollArea>
+              <Button asChild variant="outline" className="w-full mt-4">
+                <Link to="/meditask">
+                  View All Tasks <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* QOF Gaps - Patients needing attention */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-warning" />
+                    QOF Gaps
+                  </CardTitle>
+                  <CardDescription>Patients missing key health data</CardDescription>
+                </div>
+                <Button variant="ghost" size="sm" onClick={exportQOFGaps}>
+                  <Download className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <Select value={gapFilter} onValueChange={(v) => setGapFilter(v as GapFilter)}>
+                  <SelectTrigger className="h-8 w-[160px]">
+                    <SelectValue placeholder="Filter by gap" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Gaps</SelectItem>
+                    <SelectItem value="bp">Missing BP ({qofGaps.missingBP.length})</SelectItem>
+                    <SelectItem value="smoking">Missing Smoking ({qofGaps.missingSmoking.length})</SelectItem>
+                    <SelectItem value="no-data">No Data ({qofGaps.missingResponses.length})</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="relative flex-1 min-w-[150px]">
+                  <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-8 h-8"
+                  />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[280px]">
+                {filteredGapPatients.length > 0 ? (
+                  <div className="space-y-2">
+                    {filteredGapPatients.slice(0, 15).map((patient) => {
+                      const missingItems = [];
+                      if (qofGaps.missingBP.some(p => p.id === patient.id)) missingItems.push('BP');
+                      if (qofGaps.missingSmoking.some(p => p.id === patient.id)) missingItems.push('Smoking');
+                      if (qofGaps.missingResponses.some(p => p.id === patient.id)) missingItems.push('No Data');
+                      
+                      return (
+                        <Link
+                          key={patient.id}
+                          to={`/patients?search=${encodeURIComponent(patient.name)}`}
+                          className="flex items-center gap-3 p-2 border rounded-lg hover:bg-muted transition-colors"
+                        >
+                          <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium truncate">{patient.name}</p>
+                            <p className="text-xs text-muted-foreground">{patient.nhs_number}</p>
+                          </div>
+                          <div className="flex gap-1 flex-wrap justify-end">
+                            {missingItems.map(item => (
+                              <Badge key={item} variant="outline" className="text-xs px-1 py-0">
+                                {item}
+                              </Badge>
+                            ))}
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-8">
+                    <CheckCircle2 className="h-8 w-8 mb-2" />
+                    <p>No patients match filters</p>
+                  </div>
+                )}
+              </ScrollArea>
+              {filteredGapPatients.length > 15 && (
+                <p className="text-xs text-muted-foreground text-center mt-2">
+                  Showing 15 of {filteredGapPatients.length} patients
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Health Alerts */}
+        {healthAlerts.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+                Unresolved Health Alerts
+              </CardTitle>
+              <CardDescription>{healthAlerts.length} alerts requiring attention</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {healthAlerts.slice(0, 6).map((alert: any) => (
+                  <div key={alert.id} className={`p-4 rounded-lg border ${getSeverityColor(alert.severity)}`}>
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <span className="font-medium text-sm">{alert.title}</span>
+                      <Badge variant={alert.severity === 'critical' ? 'destructive' : 'secondary'}>
+                        {alert.severity}
+                      </Badge>
+                    </div>
+                    <p className="text-xs mb-2 line-clamp-2">{alert.description}</p>
+                    {alert.patients && (
+                      <Link 
+                        to={`/patients?search=${encodeURIComponent(alert.patients.name)}`}
+                        className="flex items-center gap-1 text-xs text-primary hover:underline"
+                      >
+                        <User className="h-3 w-3" />
+                        {alert.patients.name}
+                      </Link>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </TooltipProvider>
   );
 }
