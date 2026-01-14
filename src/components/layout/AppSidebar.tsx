@@ -23,7 +23,7 @@ const navItems = [{
   href: '/batches'
 }, {
   icon: Phone,
-  label: 'Calls',
+  label: 'Calls History',
   href: '/calls'
 }, {
   icon: FileDown,
