@@ -108,9 +108,44 @@ export function CreateBatchFromUpload({ open, onOpenChange }: CreateBatchFromUpl
     return patients;
   };
 
-  const processFile = async (file: File, index: number) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files?.length) return;
+
+    // Store files in array to avoid losing reference
+    const fileArray = Array.from(files);
+    
+    setIsProcessing(true);
+    setProcessedCount(0);
+
+    const initialPatients: ExtractedPatient[] = fileArray.map(file => ({
+      file: file.name,
+      name: null,
+      phone_number: null,
+      nhs_number: null,
+      date_of_birth: null,
+      conditions: [],
+      smoking_status: null,
+      hba1c_mmol_mol: null,
+      medications: [],
+      frailty_status: null,
+      status: "pending" as const,
+      selected: false,
+    }));
+
+    setPatients(initialPatients);
+
+    // Process files sequentially with the stored array
+    for (let i = 0; i < fileArray.length; i++) {
+      await processFileWithData(fileArray[i], i);
+    }
+
+    setIsProcessing(false);
+  };
+
+  const processFileWithData = async (file: File, index: number) => {
     setPatients(prev => prev.map((p, i) => 
-      i === index ? { ...p, status: "processing" } : p
+      i === index ? { ...p, status: "processing" as const } : p
     ));
 
     try {
@@ -124,61 +159,51 @@ export function CreateBatchFromUpload({ open, onOpenChange }: CreateBatchFromUpl
         });
         setProcessedCount(prev => prev + csvPatients.length);
       } else {
+        console.log("Extracting text from PDF:", file.name);
         const pdfText = await extractTextFromPDF(file);
+        console.log("PDF text length:", pdfText.length);
+        
         const { data, error } = await supabase.functions.invoke("extract-patient-from-pdf", {
           body: { pdfText },
         });
 
+        console.log("Extraction response:", { data, error });
+
         if (error) throw error;
         if (!data?.success) throw new Error(data?.error || "Extraction failed");
 
-        setPatients(prev => prev.map((p, i) => 
-          i === index ? {
-            ...p,
-            ...data.data,
-            status: "success",
-            selected: Boolean(data.data.name && data.data.phone_number),
-          } : p
-        ));
+        const extractedData = data.data;
+        console.log("Extracted patient data:", extractedData);
+
+        setPatients(prev => {
+          const updated = prev.map((p, i) => 
+            i === index ? {
+              ...p,
+              name: extractedData.name || null,
+              phone_number: extractedData.phone_number || null,
+              nhs_number: extractedData.nhs_number || null,
+              date_of_birth: extractedData.date_of_birth || null,
+              conditions: extractedData.conditions || [],
+              smoking_status: extractedData.smoking_status || null,
+              hba1c_mmol_mol: extractedData.hba1c_mmol_mol || null,
+              medications: extractedData.medications || [],
+              frailty_status: extractedData.frailty_status || null,
+              status: "success" as const,
+              selected: Boolean(extractedData.name && extractedData.phone_number),
+            } : p
+          );
+          console.log("Updated patients:", updated);
+          return updated;
+        });
         setProcessedCount(prev => prev + 1);
       }
     } catch (error) {
+      console.error("Error processing file:", error);
       setPatients(prev => prev.map((p, i) => 
-        i === index ? { ...p, status: "error", error: String(error) } : p
+        i === index ? { ...p, status: "error" as const, error: String(error) } : p
       ));
       setProcessedCount(prev => prev + 1);
     }
-  };
-
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files?.length) return;
-
-    setIsProcessing(true);
-    setProcessedCount(0);
-
-    const initialPatients: ExtractedPatient[] = Array.from(files).map(file => ({
-      file: file.name,
-      name: null,
-      phone_number: null,
-      nhs_number: null,
-      date_of_birth: null,
-      conditions: [],
-      smoking_status: null,
-      hba1c_mmol_mol: null,
-      medications: [],
-      frailty_status: null,
-      status: "pending",
-      selected: false,
-    }));
-
-    setPatients(initialPatients);
-
-    for (let i = 0; i < files.length; i++) {
-      await processFile(files[i], i);
-    }
-
-    setIsProcessing(false);
   };
 
   const createBatchMutation = useMutation({
