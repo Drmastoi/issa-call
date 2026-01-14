@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { AIInsightsPanel } from '@/components/dashboard/AIInsightsPanel';
 import { RiskAlertsWidget } from '@/components/dashboard/RiskAlertsWidget';
 import { QOFProgressPanel } from '@/components/dashboard/QOFProgressPanel';
+import { MediTaskWidget } from '@/components/dashboard/MediTaskWidget';
 
 export default function Dashboard() {
   const { data: stats } = useQuery({
@@ -134,18 +135,23 @@ export default function Dashboard() {
       </div>
 
       {/* Main Grid: AI Insights + Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
         {/* Left Column: AI Insights */}
         <div className="lg:col-span-1 space-y-6">
           <AIInsightsPanel />
         </div>
 
-        {/* Right Column: Risk Alerts + QOF */}
+        {/* Middle Column: Risk Alerts + QOF */}
         <div className="lg:col-span-2 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <RiskAlertsWidget maxItems={4} />
             <QOFProgressPanel />
           </div>
+        </div>
+
+        {/* Right Column: MediTask Widget */}
+        <div className="lg:col-span-1">
+          <MediTaskWidget />
         </div>
       </div>
 
