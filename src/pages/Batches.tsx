@@ -379,6 +379,24 @@ export default function Batches() {
                 <div className="space-y-2">
                   <Label>Select Patients ({selectedPatients.length} selected)</Label>
                   <Card>
+                    <div className="p-4 pb-2 border-b">
+                      <div className="flex items-center space-x-3">
+                        <Checkbox
+                          id="select-all-create"
+                          checked={patients && patients.length > 0 && selectedPatients.length === patients.length}
+                          onCheckedChange={(checked) => {
+                            if (checked && patients) {
+                              setSelectedPatients(patients.map(p => p.id));
+                            } else {
+                              setSelectedPatients([]);
+                            }
+                          }}
+                        />
+                        <label htmlFor="select-all-create" className="cursor-pointer font-medium">
+                          Select All
+                        </label>
+                      </div>
+                    </div>
                     <ScrollArea className="h-48">
                       <div className="p-4 space-y-2">
                         {patients?.map((patient) => (
@@ -635,6 +653,24 @@ export default function Batches() {
                 <div className="space-y-2">
                   <Label>Select Patients ({editSelectedPatients.length} selected)</Label>
                   <Card>
+                    <div className="p-4 pb-2 border-b">
+                      <div className="flex items-center space-x-3">
+                        <Checkbox
+                          id="select-all-edit"
+                          checked={patients && patients.length > 0 && editSelectedPatients.length === patients.length}
+                          onCheckedChange={(checked) => {
+                            if (checked && patients) {
+                              setEditSelectedPatients(patients.map(p => p.id));
+                            } else {
+                              setEditSelectedPatients([]);
+                            }
+                          }}
+                        />
+                        <label htmlFor="select-all-edit" className="cursor-pointer font-medium">
+                          Select All
+                        </label>
+                      </div>
+                    </div>
                     <ScrollArea className="h-48">
                       <div className="p-4 space-y-2">
                         {patients?.map((patient) => (
