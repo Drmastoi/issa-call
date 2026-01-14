@@ -7,10 +7,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Users, Phone, CheckCircle, XCircle, Clock, 
   Activity, Scale, Ruler, Heart, Wine, Cigarette, 
-  UserCheck
+  UserCheck, X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
+import { BatchExport } from './BatchExport';
 
 interface BatchSummaryViewProps {
   batchId: string;
@@ -171,6 +171,11 @@ export function BatchSummaryView({
 
   return (
     <div className="space-y-4">
+      {/* Export Button */}
+      <div className="flex justify-end">
+        <BatchExport batchId={batchId} batchName={batchName} />
+      </div>
+      
       {/* Stats Overview */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="p-3">

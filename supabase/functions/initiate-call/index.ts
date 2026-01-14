@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { callId, patientId, patientName, phoneNumber } = await req.json();
+    const { callId, patientId, patientName, phoneNumber, batchPurpose, customQuestions } = await req.json();
     
     // Convert UK phone numbers to E.164 format
     let formattedPhone = phoneNumber;
@@ -24,7 +24,7 @@ serve(async (req) => {
       formattedPhone = '+' + phoneNumber;
     }
     
-    console.log("Initiating call:", { callId, patientId, patientName, phoneNumber, formattedPhone });
+    console.log("Initiating call:", { callId, patientId, patientName, phoneNumber, formattedPhone, batchPurpose });
 
     const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID");
     const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN");
@@ -69,6 +69,20 @@ serve(async (req) => {
     // Using Twilio's <Stream> to connect audio to ElevenLabs WebSocket
     const webhookUrl = `${SUPABASE_URL}/functions/v1/twilio-webhook`;
     
+    // Build context message based on batch purpose
+    let purposeContext = "This is a general health check call.";
+    if (batchPurpose === "smoking_status") {
+      purposeContext = "The main purpose of this call is to collect the patient's current smoking status for their medical records.";
+    } else if (batchPurpose === "bp_check") {
+      purposeContext = "The main purpose of this call is to collect the patient's blood pressure reading if they have one available.";
+    } else if (batchPurpose === "hba1c_check") {
+      purposeContext = "The main purpose of this call is to check on the patient's diabetes management and recent HbA1c readings.";
+    } else if (batchPurpose === "medication_review") {
+      purposeContext = "The main purpose of this call is to review the patient's medication adherence and any issues they may have.";
+    } else if (batchPurpose === "custom" && customQuestions?.length > 0) {
+      purposeContext = `Please ask the following specific questions: ${customQuestions.join("; ")}`;
+    }
+    
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="alice">Hello ${patientName}. This is an automated health check call from your GP practice. Please hold while we connect you to our health assistant.</Say>
@@ -77,6 +91,7 @@ serve(async (req) => {
       <Parameter name="callId" value="${callId}" />
       <Parameter name="patientId" value="${patientId}" />
       <Parameter name="patientName" value="${patientName}" />
+      <Parameter name="purposeContext" value="${purposeContext}" />
     </Stream>
   </Connect>
   <Say voice="alice">Thank you for your time. The call has ended. Goodbye.</Say>
