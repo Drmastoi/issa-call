@@ -295,6 +295,15 @@ export function CreateBatchFromUpload({ open, onOpenChange }: CreateBatchFromUpl
 
   const selectedCount = patients.filter(p => p.selected && p.name && p.phone_number).length;
   const validCount = patients.filter(p => p.name && p.phone_number).length;
+  
+  // Debug logging
+  console.log("Patient state:", { 
+    totalPatients: patients.length, 
+    selectedCount, 
+    validCount, 
+    step,
+    patients: patients.map(p => ({ name: p.name, phone: p.phone_number, selected: p.selected, status: p.status }))
+  });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
