@@ -5,7 +5,8 @@ import {
   Users, 
   TrendingUp,
   Heart,
-  Clock
+  Clock,
+  Plus
 } from 'lucide-react';
 
 interface ChatSuggestionsProps {
@@ -39,9 +40,9 @@ const suggestions = [
     color: 'text-red-500'
   },
   {
-    icon: TrendingUp,
-    label: 'QOF Gaps',
-    query: 'What are the main QOF improvement opportunities for our practice?',
+    icon: Plus,
+    label: 'Create Task',
+    query: 'Create a high priority task to review all critical patient alerts by end of today',
     color: 'text-green-500'
   },
   {
