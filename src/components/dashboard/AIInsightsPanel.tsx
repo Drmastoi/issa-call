@@ -5,7 +5,6 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDashboardInsights, useHealthAlerts, useRunAnalysis, useAcknowledgeAlert } from "@/hooks/useHealthAlerts";
-import { QOF_INDICATORS, calculateQOFProgress } from "@/lib/qof-codes";
 import { cn } from "@/lib/utils";
 
 export function AIInsightsPanel() {
@@ -137,22 +136,22 @@ export function AIInsightsPanel() {
         </CardHeader>
         <CardContent className="space-y-3">
           <QOFProgressItem
-            label="BP Monitoring"
+            label="BP Monitoring (Hypertension)"
             recorded={insights?.bp_coverage.recorded || 0}
             total={insights?.bp_coverage.total || 0}
-            indicator={QOF_INDICATORS.find(q => q.id === 'hypertension_monitoring')!}
+            targetPercent={77}
           />
           <QOFProgressItem
             label="Smoking Status"
             recorded={insights?.smoking_coverage.recorded || 0}
             total={insights?.smoking_coverage.total || 0}
-            indicator={QOF_INDICATORS.find(q => q.id === 'smoking_status')!}
+            targetPercent={90}
           />
           <QOFProgressItem
-            label="BMI Recording"
+            label="HbA1c Recording"
             recorded={insights?.bmi_coverage.recorded || 0}
             total={insights?.bmi_coverage.total || 0}
-            indicator={QOF_INDICATORS.find(q => q.id === 'bmi_recording')!}
+            targetPercent={70}
           />
         </CardContent>
       </Card>
@@ -164,18 +163,15 @@ function QOFProgressItem({
   label, 
   recorded, 
   total, 
-  indicator 
+  targetPercent
 }: { 
   label: string; 
   recorded: number; 
   total: number; 
-  indicator: { targetPercent: number } 
+  targetPercent: number;
 }) {
-  const { percent, status } = calculateQOFProgress(
-    indicator as any,
-    recorded,
-    total
-  );
+  const percent = total > 0 ? Math.round((recorded / total) * 100) : 0;
+  const status = percent >= targetPercent ? 'good' : percent >= targetPercent * 0.8 ? 'warning' : 'poor';
 
   return (
     <div className="space-y-1">
