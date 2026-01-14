@@ -68,14 +68,36 @@ export default function AIAnalytics() {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['Cardiovascular']));
   const [viewTab, setViewTab] = useState<ViewTab>('indicators');
 
-  // Fetch patients
+  // Fetch patients with clinical data
   const { data: patients = [] } = useQuery({
     queryKey: ['analytics-patients'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('patients')
-        .select('id, name, nhs_number, phone_number, notes')
+        .select('id, name, nhs_number, phone_number, notes, conditions, hba1c_mmol_mol, hba1c_date, cholesterol_ldl, cholesterol_hdl, cholesterol_date, frailty_status, date_of_birth, cha2ds2_vasc_score')
         .order('name');
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  // Fetch AI summaries for insights
+  const { data: aiSummaries = [] } = useQuery({
+    queryKey: ['analytics-ai-summaries'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('ai_summaries')
+        .select(`
+          id,
+          patient_id,
+          clinical_summary,
+          qof_relevance,
+          action_items,
+          key_findings,
+          created_at,
+          patients (id, name)
+        `)
+        .order('created_at', { ascending: false });
       if (error) throw error;
       return data ?? [];
     },
@@ -166,10 +188,45 @@ export default function AIAnalytics() {
       return responses.length === 0 || !responses.some(r => r.smoking_status);
     });
 
-    return { missingResponses, missingBP, missingSmoking };
+    // Missing HbA1c for diabetic patients
+    const diabeticPatients = patients.filter(p => 
+      p.conditions?.some((c: string) => c.toLowerCase().includes('diabetes'))
+    );
+    const missingHbA1c = diabeticPatients.filter(p => !p.hba1c_mmol_mol);
+
+    // Missing cholesterol for cardiovascular patients
+    const cvdPatients = patients.filter(p => 
+      p.conditions?.some((c: string) => 
+        c.toLowerCase().includes('chd') || 
+        c.toLowerCase().includes('stroke') || 
+        c.toLowerCase().includes('hypertension') ||
+        c.toLowerCase().includes('heart')
+      )
+    );
+    const missingCholesterol = cvdPatients.filter(p => !p.cholesterol_ldl);
+
+    return { missingResponses, missingBP, missingSmoking, missingHbA1c, missingCholesterol, diabeticPatients, cvdPatients };
   };
 
   const qofGaps = calculateQOFGaps();
+
+  // Calculate condition-based patient cohorts
+  const patientCohorts = {
+    diabetes: patients.filter(p => p.conditions?.some((c: string) => c.toLowerCase().includes('diabetes'))),
+    hypertension: patients.filter(p => p.conditions?.some((c: string) => c.toLowerCase().includes('hypertension'))),
+    chd: patients.filter(p => p.conditions?.some((c: string) => c.toLowerCase().includes('chd') || c.toLowerCase().includes('coronary'))),
+    asthma: patients.filter(p => p.conditions?.some((c: string) => c.toLowerCase().includes('asthma'))),
+    copd: patients.filter(p => p.conditions?.some((c: string) => c.toLowerCase().includes('copd'))),
+    af: patients.filter(p => p.conditions?.some((c: string) => c.toLowerCase().includes('atrial fibrillation') || c.toLowerCase().includes('af'))),
+    stroke: patients.filter(p => p.conditions?.some((c: string) => c.toLowerCase().includes('stroke') || c.toLowerCase().includes('tia'))),
+    mentalHealth: patients.filter(p => p.conditions?.some((c: string) => 
+      c.toLowerCase().includes('schizophrenia') || 
+      c.toLowerCase().includes('bipolar') || 
+      c.toLowerCase().includes('psychosis') ||
+      c.toLowerCase().includes('dementia')
+    )),
+    frail: patients.filter(p => p.frailty_status === 'moderate' || p.frailty_status === 'severe'),
+  };
 
   // Filter patients by search and gap type
   const getFilteredGapPatients = () => {
@@ -217,41 +274,153 @@ export default function AIAnalytics() {
   const filteredGapPatients = getFilteredGapPatients();
   const filteredTasks = getFilteredTasks();
 
-  // Calculate KPIs
+  // Calculate KPIs with clinical data
   const kpis = {
     totalPatients: patients.length,
     patientsWithData: new Set(callResponses.map(r => r.patient_id)).size,
+    patientsWithConditions: patients.filter(p => p.conditions && p.conditions.length > 0).length,
     pendingTasksCount: pendingTasks.length,
     highPriorityTasks: pendingTasks.filter(t => t.priority === 'high').length,
     unresolvedAlerts: healthAlerts.length,
     criticalAlerts: healthAlerts.filter(a => a.severity === 'critical').length,
+    aiSummariesGenerated: aiSummaries.length,
     dataCompleteness: patients.length > 0 
       ? Math.round((new Set(callResponses.map(r => r.patient_id)).size / patients.length) * 100) 
       : 0,
+    diabeticControlled: qofGaps.diabeticPatients.filter(p => p.hba1c_mmol_mol && p.hba1c_mmol_mol <= 58).length,
+    bpControlled: callResponses.filter(r => 
+      r.blood_pressure_systolic && r.blood_pressure_diastolic &&
+      r.blood_pressure_systolic <= 140 && r.blood_pressure_diastolic <= 90
+    ).length,
   };
 
-  // Calculate QOF progress for each indicator
+  // Calculate QOF progress for each indicator using real patient data
   const getIndicatorProgress = (indicator: typeof QOF_INDICATORS[0]) => {
     let achieved = 0;
-    const total = patients.length;
+    let total = patients.length;
 
-    // Calculate based on available data
-    if (indicator.code === 'SMOK002') {
-      achieved = callResponses.filter(r => r.smoking_status).length;
-    } else if (indicator.code.startsWith('HYP') || indicator.code.startsWith('CHD0') || indicator.code.startsWith('STIA') || indicator.code.startsWith('DM036')) {
-      // BP-related indicators
-      achieved = callResponses.filter(r => {
-        if (!r.blood_pressure_systolic || !r.blood_pressure_diastolic) return false;
+    // Calculate based on available data and patient conditions
+    switch (indicator.code) {
+      case 'SMOK002': {
+        // Smoking status recording for patients with LTCs
+        const patientsWithLTC = patients.filter(p => p.conditions && p.conditions.length > 0);
+        total = patientsWithLTC.length || patients.length;
+        achieved = callResponses.filter(r => r.smoking_status).length;
+        break;
+      }
+      case 'HYP008': {
+        // Hypertension BP control for under 80
+        total = patientCohorts.hypertension.length;
+        achieved = callResponses.filter(r => {
+          if (!r.blood_pressure_systolic || !r.blood_pressure_diastolic) return false;
+          return r.blood_pressure_systolic <= 140 && r.blood_pressure_diastolic <= 90;
+        }).length;
+        break;
+      }
+      case 'HYP009': {
+        // Hypertension BP control for 80+
+        total = patientCohorts.hypertension.length;
+        achieved = callResponses.filter(r => {
+          if (!r.blood_pressure_systolic || !r.blood_pressure_diastolic) return false;
+          return r.blood_pressure_systolic <= 150 && r.blood_pressure_diastolic <= 90;
+        }).length;
+        break;
+      }
+      case 'DM006': {
+        // Diabetes HbA1c ≤58
+        total = patientCohorts.diabetes.length;
+        achieved = patientCohorts.diabetes.filter(p => p.hba1c_mmol_mol && p.hba1c_mmol_mol <= 58).length;
+        break;
+      }
+      case 'DM012': {
+        // Diabetes HbA1c ≤75 for frail patients
+        const diabeticFrail = patientCohorts.diabetes.filter(p => p.frailty_status === 'moderate' || p.frailty_status === 'severe');
+        total = diabeticFrail.length;
+        achieved = diabeticFrail.filter(p => p.hba1c_mmol_mol && p.hba1c_mmol_mol <= 75).length;
+        break;
+      }
+      case 'DM036': {
+        // Diabetes BP control
+        total = patientCohorts.diabetes.length;
+        achieved = callResponses.filter(r => {
+          const isDiabetic = patientCohorts.diabetes.some(p => p.id === r.patient_id);
+          if (!isDiabetic || !r.blood_pressure_systolic || !r.blood_pressure_diastolic) return false;
+          return r.blood_pressure_systolic <= 140 && r.blood_pressure_diastolic <= 90;
+        }).length;
+        break;
+      }
+      case 'CHOL003':
+      case 'DM034':
+      case 'DM035': {
+        // Statin prescription - check cholesterol data as proxy
+        const relevantPatients = indicator.code.startsWith('DM') ? patientCohorts.diabetes : patientCohorts.chd;
+        total = relevantPatients.length;
+        achieved = relevantPatients.filter(p => p.cholesterol_ldl || p.cholesterol_hdl).length;
+        break;
+      }
+      case 'CHOL004': {
+        // Cholesterol target met
+        total = patientCohorts.chd.length + patientCohorts.stroke.length;
+        achieved = patients.filter(p => p.cholesterol_ldl && p.cholesterol_ldl <= 2.0).length;
+        break;
+      }
+      case 'AF007':
+      case 'AF008': {
+        // AF anticoagulation
+        total = patientCohorts.af.length;
+        achieved = patientCohorts.af.filter(p => p.cha2ds2_vasc_score && p.cha2ds2_vasc_score >= 2).length;
+        break;
+      }
+      case 'CHD015':
+      case 'CHD016': {
+        // CHD BP control
+        total = patientCohorts.chd.length;
         const target = indicator.ageGroup === 'over80' ? { sys: 150, dia: 90 } : { sys: 140, dia: 90 };
-        return r.blood_pressure_systolic <= target.sys && r.blood_pressure_diastolic <= target.dia;
-      }).length;
-    } else {
-      // For indicators we can't calculate from call_responses, show simulated data
-      // In production, this would come from clinical data
-      achieved = Math.floor(Math.random() * total * 0.7);
+        achieved = callResponses.filter(r => {
+          const isCHD = patientCohorts.chd.some(p => p.id === r.patient_id);
+          if (!isCHD || !r.blood_pressure_systolic || !r.blood_pressure_diastolic) return false;
+          return r.blood_pressure_systolic <= target.sys && r.blood_pressure_diastolic <= target.dia;
+        }).length;
+        break;
+      }
+      case 'STIA014':
+      case 'STIA015': {
+        // Stroke/TIA BP control
+        total = patientCohorts.stroke.length;
+        const target = indicator.ageGroup === 'over80' ? { sys: 150, dia: 90 } : { sys: 140, dia: 90 };
+        achieved = callResponses.filter(r => {
+          const isStroke = patientCohorts.stroke.some(p => p.id === r.patient_id);
+          if (!isStroke || !r.blood_pressure_systolic || !r.blood_pressure_diastolic) return false;
+          return r.blood_pressure_systolic <= target.sys && r.blood_pressure_diastolic <= target.dia;
+        }).length;
+        break;
+      }
+      case 'AST007': {
+        // Asthma review
+        total = patientCohorts.asthma.length;
+        achieved = aiSummaries.filter(s => patientCohorts.asthma.some(p => p.id === s.patient_id)).length;
+        break;
+      }
+      case 'COPD010': {
+        // COPD FEV1
+        total = patientCohorts.copd.length;
+        achieved = aiSummaries.filter(s => patientCohorts.copd.some(p => p.id === s.patient_id)).length;
+        break;
+      }
+      case 'MH002':
+      case 'DEM004': {
+        // Mental health care plans / dementia review
+        total = patientCohorts.mentalHealth.length;
+        achieved = aiSummaries.filter(s => patientCohorts.mentalHealth.some(p => p.id === s.patient_id)).length;
+        break;
+      }
+      default: {
+        // For other indicators, use available call response data
+        achieved = callResponses.length > 0 ? Math.min(callResponses.length, total) : 0;
+      }
     }
 
-    return calculateQOFProgress(indicator, achieved, total);
+    return calculateQOFProgress(indicator, achieved, total || 1);
   };
 
   // Group indicators by category
@@ -347,13 +516,27 @@ export default function AIAnalytics() {
     const summary = [
       { metric: 'Total Patients', value: kpis.totalPatients },
       { metric: 'Patients With Data', value: kpis.patientsWithData },
+      { metric: 'Patients With Conditions', value: kpis.patientsWithConditions },
       { metric: 'Data Completeness', value: `${kpis.dataCompleteness}%` },
+      { metric: 'AI Summaries Generated', value: kpis.aiSummariesGenerated },
       { metric: 'Pending Tasks', value: kpis.pendingTasksCount },
       { metric: 'High Priority Tasks', value: kpis.highPriorityTasks },
       { metric: 'Unresolved Alerts', value: kpis.unresolvedAlerts },
       { metric: 'Missing BP Records', value: qofGaps.missingBP.length },
       { metric: 'Missing Smoking Status', value: qofGaps.missingSmoking.length },
       { metric: 'No Call Data', value: qofGaps.missingResponses.length },
+      { metric: '--- Cohorts ---', value: '' },
+      { metric: 'Diabetes Patients', value: patientCohorts.diabetes.length },
+      { metric: 'Diabetes Controlled (HbA1c ≤58)', value: kpis.diabeticControlled },
+      { metric: 'Hypertension Patients', value: patientCohorts.hypertension.length },
+      { metric: 'BP Controlled', value: kpis.bpControlled },
+      { metric: 'CHD Patients', value: patientCohorts.chd.length },
+      { metric: 'Asthma Patients', value: patientCohorts.asthma.length },
+      { metric: 'COPD Patients', value: patientCohorts.copd.length },
+      { metric: 'AF Patients', value: patientCohorts.af.length },
+      { metric: 'Stroke/TIA Patients', value: patientCohorts.stroke.length },
+      { metric: 'Mental Health Patients', value: patientCohorts.mentalHealth.length },
+      { metric: 'Frail Patients', value: patientCohorts.frail.length },
     ];
     exportToCSV(summary, 'analytics_summary', ['Metric', 'Value']);
   };
@@ -470,7 +653,99 @@ export default function AIAnalytics() {
           </Card>
         </div>
 
-        {/* Main Tabs for Indicators vs Actions */}
+        {/* Patient Cohorts Overview */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              Patient Cohorts by Condition
+            </CardTitle>
+            <CardDescription>
+              Overview of patients by clinical condition for targeted QOF interventions
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+              <div className="p-3 border rounded-lg">
+                <div className="flex items-center gap-2 mb-1">
+                  <Heart className="h-4 w-4 text-red-500" />
+                  <span className="text-sm font-medium">Hypertension</span>
+                </div>
+                <p className="text-2xl font-bold">{patientCohorts.hypertension.length}</p>
+                <p className="text-xs text-muted-foreground">
+                  {kpis.bpControlled} controlled
+                </p>
+              </div>
+              <div className="p-3 border rounded-lg">
+                <div className="flex items-center gap-2 mb-1">
+                  <Activity className="h-4 w-4 text-blue-500" />
+                  <span className="text-sm font-medium">Diabetes</span>
+                </div>
+                <p className="text-2xl font-bold">{patientCohorts.diabetes.length}</p>
+                <p className="text-xs text-muted-foreground">
+                  {kpis.diabeticControlled} HbA1c ≤58
+                </p>
+              </div>
+              <div className="p-3 border rounded-lg">
+                <div className="flex items-center gap-2 mb-1">
+                  <HeartPulse className="h-4 w-4 text-pink-500" />
+                  <span className="text-sm font-medium">CHD</span>
+                </div>
+                <p className="text-2xl font-bold">{patientCohorts.chd.length}</p>
+                <p className="text-xs text-muted-foreground">coronary heart disease</p>
+              </div>
+              <div className="p-3 border rounded-lg">
+                <div className="flex items-center gap-2 mb-1">
+                  <Wind className="h-4 w-4 text-cyan-500" />
+                  <span className="text-sm font-medium">Asthma/COPD</span>
+                </div>
+                <p className="text-2xl font-bold">{patientCohorts.asthma.length + patientCohorts.copd.length}</p>
+                <p className="text-xs text-muted-foreground">
+                  {patientCohorts.asthma.length} asthma, {patientCohorts.copd.length} COPD
+                </p>
+              </div>
+              <div className="p-3 border rounded-lg">
+                <div className="flex items-center gap-2 mb-1">
+                  <Brain className="h-4 w-4 text-purple-500" />
+                  <span className="text-sm font-medium">Mental Health</span>
+                </div>
+                <p className="text-2xl font-bold">{patientCohorts.mentalHealth.length}</p>
+                <p className="text-xs text-muted-foreground">
+                  {patientCohorts.frail.length} frail
+                </p>
+              </div>
+            </div>
+            {aiSummaries.length > 0 && (
+              <div className="mt-4 pt-4 border-t">
+                <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                  <Brain className="h-4 w-4" />
+                  Recent AI Summaries ({aiSummaries.length} total)
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {aiSummaries.slice(0, 3).map((summary: any) => (
+                    <div key={summary.id} className="p-3 bg-muted/50 rounded-lg text-sm">
+                      <div className="flex items-center justify-between mb-1">
+                        <Link 
+                          to={`/patients?search=${encodeURIComponent(summary.patients?.name || '')}`}
+                          className="font-medium text-primary hover:underline"
+                        >
+                          {summary.patients?.name}
+                        </Link>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(summary.created_at).toLocaleDateString('en-GB')}
+                        </span>
+                      </div>
+                      <p className="text-muted-foreground line-clamp-2">
+                        {summary.clinical_summary}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <Tabs value={viewTab} onValueChange={(v) => setViewTab(v as ViewTab)} className="w-full">
           <TabsList className="grid w-full max-w-md grid-cols-2">
             <TabsTrigger value="indicators" className="flex items-center gap-2">
