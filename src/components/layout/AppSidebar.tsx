@@ -4,6 +4,8 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useState } from 'react';
+import issaCareLogo from '@/assets/issa-care-logo.jpg';
+
 const navItems = [{
   icon: LayoutDashboard,
   label: 'Dashboard',
@@ -33,6 +35,7 @@ const navItems = [{
   label: 'Settings',
   href: '/settings'
 }];
+
 export function AppSidebar() {
   const location = useLocation();
   const {
@@ -41,17 +44,19 @@ export function AppSidebar() {
   } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   return <aside className={cn("h-screen bg-sidebar flex flex-col border-r border-sidebar-border transition-all duration-300", collapsed ? "w-16" : "w-64")}>
-      {/* Header */}
-      <div className="p-4 flex items-center justify-between border-b border-sidebar-border">
-        {!collapsed && <div className="flex items-center gap-3">
-            <div className="p-2 bg-sidebar-primary rounded-lg">
-              <Phone className="h-5 w-5 text-sidebar-primary-foreground" />
-            </div>
-            <span className="text-lg font-semibold text-sidebar-foreground">ISSA.Call</span>
-          </div>}
-        {collapsed && <div className="p-2 bg-sidebar-primary rounded-lg mx-auto">
+      {/* Header with Logo */}
+      <div className="p-4 flex items-center justify-center border-b border-sidebar-border">
+        {!collapsed ? (
+          <img 
+            src={issaCareLogo} 
+            alt="ISSA.CARE" 
+            className="h-10 object-contain"
+          />
+        ) : (
+          <div className="p-2 bg-sidebar-primary rounded-lg">
             <Phone className="h-5 w-5 text-sidebar-primary-foreground" />
-          </div>}
+          </div>
+        )}
       </div>
 
       {/* Navigation */}
