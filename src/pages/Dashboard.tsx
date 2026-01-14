@@ -252,7 +252,7 @@ export default function Dashboard() {
           <img 
             src={issaCareLogo} 
             alt="ISSA.CARE" 
-            className="h-12 w-12 rounded-xl object-cover shadow-md"
+            className="h-12 object-contain"
           />
           <div>
             <h1 className="text-2xl lg:text-3xl font-bold text-foreground">
