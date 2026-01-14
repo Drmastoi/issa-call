@@ -419,9 +419,20 @@ export type Database = {
       }
       patients: {
         Row: {
+          cha2ds2_vasc_score: number | null
+          cholesterol_date: string | null
+          cholesterol_hdl: number | null
+          cholesterol_ldl: number | null
+          conditions: string[] | null
           created_at: string
           created_by: string | null
+          date_of_birth: string | null
+          frailty_status: string | null
+          hba1c_date: string | null
+          hba1c_mmol_mol: number | null
           id: string
+          last_review_date: string | null
+          medications: string[] | null
           name: string
           nhs_number: string | null
           notes: string | null
@@ -430,9 +441,20 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cha2ds2_vasc_score?: number | null
+          cholesterol_date?: string | null
+          cholesterol_hdl?: number | null
+          cholesterol_ldl?: number | null
+          conditions?: string[] | null
           created_at?: string
           created_by?: string | null
+          date_of_birth?: string | null
+          frailty_status?: string | null
+          hba1c_date?: string | null
+          hba1c_mmol_mol?: number | null
           id?: string
+          last_review_date?: string | null
+          medications?: string[] | null
           name: string
           nhs_number?: string | null
           notes?: string | null
@@ -441,9 +463,20 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cha2ds2_vasc_score?: number | null
+          cholesterol_date?: string | null
+          cholesterol_hdl?: number | null
+          cholesterol_ldl?: number | null
+          conditions?: string[] | null
           created_at?: string
           created_by?: string | null
+          date_of_birth?: string | null
+          frailty_status?: string | null
+          hba1c_date?: string | null
+          hba1c_mmol_mol?: number | null
           id?: string
+          last_review_date?: string | null
+          medications?: string[] | null
           name?: string
           nhs_number?: string | null
           notes?: string | null

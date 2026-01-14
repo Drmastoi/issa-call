@@ -35,14 +35,17 @@ import {
   Cigarette,
   ChevronDown,
   ChevronRight,
-  Info
+  Info,
+  ListChecks
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { QOF_INDICATORS, QOF_CATEGORIES, calculateQOFProgress } from '@/lib/qof-codes';
+import QOFActionList from '@/components/qof/QOFActionList';
 
 type GapFilter = 'all' | 'bp' | 'smoking' | 'no-data';
 type PriorityFilter = 'all' | 'high' | 'medium' | 'normal';
 type CategoryTab = 'all' | string;
+type ViewTab = 'indicators' | 'actions';
 
 const getCategoryIcon = (iconName: string) => {
   switch (iconName) {
@@ -63,6 +66,7 @@ export default function AIAnalytics() {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryTab, setCategoryTab] = useState<CategoryTab>('all');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['Cardiovascular']));
+  const [viewTab, setViewTab] = useState<ViewTab>('indicators');
 
   // Fetch patients
   const { data: patients = [] } = useQuery({
@@ -466,125 +470,145 @@ export default function AIAnalytics() {
           </Card>
         </div>
 
-        {/* QOF Indicators by Category */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-primary" />
-              NHS QOF Indicators 2024/25
-            </CardTitle>
-            <CardDescription>
-              Track achievement against Quality and Outcomes Framework targets across all clinical domains
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[500px] pr-4">
-              <div className="space-y-4">
-                {groupedIndicators.map((category) => {
-                  const Icon = getCategoryIcon(category.icon);
-                  const categoryScore = getCategoryScore(category.indicators);
-                  const isExpanded = expandedCategories.has(category.name);
+        {/* Main Tabs for Indicators vs Actions */}
+        <Tabs value={viewTab} onValueChange={(v) => setViewTab(v as ViewTab)} className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="indicators" className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              QOF Indicators
+            </TabsTrigger>
+            <TabsTrigger value="actions" className="flex items-center gap-2">
+              <ListChecks className="h-4 w-4" />
+              Action List
+            </TabsTrigger>
+          </TabsList>
 
-                  return (
-                    <Collapsible
-                      key={category.id}
-                      open={isExpanded}
-                      onOpenChange={() => toggleCategory(category.name)}
-                    >
-                      <CollapsibleTrigger asChild>
-                        <div className="flex items-center justify-between p-4 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 bg-primary/10 rounded-lg">
-                              <Icon className="h-5 w-5 text-primary" />
-                            </div>
-                            <div>
-                              <h3 className="font-semibold">{category.name}</h3>
-                              <p className="text-sm text-muted-foreground">
-                                {category.indicators.length} indicators
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <div className="text-right">
-                              <div className={`text-lg font-bold ${categoryScore >= 70 ? 'text-green-600' : categoryScore >= 50 ? 'text-amber-500' : 'text-red-500'}`}>
-                                {categoryScore}%
-                              </div>
-                              <div className="text-xs text-muted-foreground">avg. achievement</div>
-                            </div>
-                            {isExpanded ? (
-                              <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                            ) : (
-                              <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                            )}
-                          </div>
-                        </div>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <div className="mt-2 ml-4 space-y-3 border-l-2 border-muted pl-4">
-                          {category.indicators.map((indicator) => {
-                            const progress = getIndicatorProgress(indicator);
-                            return (
-                              <div key={indicator.id} className="p-3 bg-muted/30 rounded-lg space-y-2">
-                                <div className="flex items-start justify-between gap-2">
-                                  <div className="flex-1">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <Badge variant="outline" className="text-xs font-mono">
-                                        {indicator.code}
-                                      </Badge>
-                                      <span className="font-medium text-sm">{indicator.name}</span>
-                                      {indicator.condition && (
-                                        <Badge variant="secondary" className="text-xs">
-                                          {indicator.condition}
-                                        </Badge>
-                                      )}
-                                      <Tooltip>
-                                        <TooltipTrigger>
-                                          <Info className="h-3 w-3 text-muted-foreground" />
-                                        </TooltipTrigger>
-                                        <TooltipContent side="top" className="max-w-xs">
-                                          <p className="text-sm">{indicator.description}</p>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    </div>
-                                    {indicator.ageGroup && (
-                                      <span className="text-xs text-muted-foreground">
-                                        Age group: {indicator.ageGroup === 'under80' ? '≤79 years' : 
-                                          indicator.ageGroup === 'over80' ? '≥80 years' : 
-                                          indicator.ageGroup === '40plus' ? '40+ years' : 'All ages'}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="text-right shrink-0">
-                                    <span className={`font-bold ${getStatusColor(progress.status)}`}>
-                                      {progress.percent}%
-                                    </span>
-                                    <span className="text-muted-foreground text-sm"> / {indicator.targetPercent}%</span>
-                                  </div>
+          <TabsContent value="indicators" className="mt-4">
+            {/* QOF Indicators by Category */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                  NHS QOF Indicators 2024/25
+                </CardTitle>
+                <CardDescription>
+                  Track achievement against Quality and Outcomes Framework targets across all clinical domains
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-[500px] pr-4">
+                  <div className="space-y-4">
+                    {groupedIndicators.map((category) => {
+                      const Icon = getCategoryIcon(category.icon);
+                      const categoryScore = getCategoryScore(category.indicators);
+                      const isExpanded = expandedCategories.has(category.name);
+
+                      return (
+                        <Collapsible
+                          key={category.id}
+                          open={isExpanded}
+                          onOpenChange={() => toggleCategory(category.name)}
+                        >
+                          <CollapsibleTrigger asChild>
+                            <div className="flex items-center justify-between p-4 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                              <div className="flex items-center gap-3">
+                                <div className="p-2 bg-primary/10 rounded-lg">
+                                  <Icon className="h-5 w-5 text-primary" />
                                 </div>
-                                <div className="relative">
-                                  <Progress value={progress.percent} className="h-2" />
-                                  <div 
-                                    className="absolute top-0 h-2 w-0.5 bg-foreground/70" 
-                                    style={{ left: `${Math.min(indicator.targetPercent, 100)}%` }}
-                                  />
-                                </div>
-                                {progress.gap > 0 && (
-                                  <p className="text-xs text-muted-foreground">
-                                    Gap: {progress.gap}% • ~{Math.ceil((progress.gap / 100) * patients.length)} patients needed to meet target
+                                <div>
+                                  <h3 className="font-semibold">{category.name}</h3>
+                                  <p className="text-sm text-muted-foreground">
+                                    {category.indicators.length} indicators
                                   </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-4">
+                                <div className="text-right">
+                                  <div className={`text-lg font-bold ${categoryScore >= 70 ? 'text-green-600' : categoryScore >= 50 ? 'text-amber-500' : 'text-red-500'}`}>
+                                    {categoryScore}%
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">avg. achievement</div>
+                                </div>
+                                {isExpanded ? (
+                                  <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                                ) : (
+                                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
                                 )}
                               </div>
-                            );
-                          })}
-                        </div>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  );
-                })}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
+                            </div>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <div className="mt-2 ml-4 space-y-3 border-l-2 border-muted pl-4">
+                              {category.indicators.map((indicator) => {
+                                const progress = getIndicatorProgress(indicator);
+                                return (
+                                  <div key={indicator.id} className="p-3 bg-muted/30 rounded-lg space-y-2">
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <Badge variant="outline" className="text-xs font-mono">
+                                            {indicator.code}
+                                          </Badge>
+                                          <span className="font-medium text-sm">{indicator.name}</span>
+                                          {indicator.condition && (
+                                            <Badge variant="secondary" className="text-xs">
+                                              {indicator.condition}
+                                            </Badge>
+                                          )}
+                                          <Tooltip>
+                                            <TooltipTrigger>
+                                              <Info className="h-3 w-3 text-muted-foreground" />
+                                            </TooltipTrigger>
+                                            <TooltipContent side="top" className="max-w-xs">
+                                              <p className="text-sm">{indicator.description}</p>
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        </div>
+                                        {indicator.ageGroup && (
+                                          <span className="text-xs text-muted-foreground">
+                                            Age group: {indicator.ageGroup === 'under80' ? '≤79 years' : 
+                                              indicator.ageGroup === 'over80' ? '≥80 years' : 
+                                              indicator.ageGroup === '40plus' ? '40+ years' : 'All ages'}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="text-right shrink-0">
+                                        <span className={`font-bold ${getStatusColor(progress.status)}`}>
+                                          {progress.percent}%
+                                        </span>
+                                        <span className="text-muted-foreground text-sm"> / {indicator.targetPercent}%</span>
+                                      </div>
+                                    </div>
+                                    <div className="relative">
+                                      <Progress value={progress.percent} className="h-2" />
+                                      <div 
+                                        className="absolute top-0 h-2 w-0.5 bg-foreground/70" 
+                                        style={{ left: `${Math.min(indicator.targetPercent, 100)}%` }}
+                                      />
+                                    </div>
+                                    {progress.gap > 0 && (
+                                      <p className="text-xs text-muted-foreground">
+                                        Gap: {progress.gap}% • ~{Math.ceil((progress.gap / 100) * patients.length)} patients needed to meet target
+                                      </p>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="actions" className="mt-4">
+            <QOFActionList />
+          </TabsContent>
+        </Tabs>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Pending Tasks */}
