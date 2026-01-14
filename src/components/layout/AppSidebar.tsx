@@ -15,7 +15,7 @@ const navItems = [{
   href: '/ai-analytics'
 }, {
   icon: Users,
-  label: 'Patients',
+  label: 'Patient List',
   href: '/patients'
 }, {
   icon: Calendar,
