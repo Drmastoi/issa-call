@@ -16,6 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import * as pdfjsLib from "pdfjs-dist";
+import { parseRTF } from "@/lib/rtf-parser";
 
 // Configure PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
@@ -81,27 +82,9 @@ export function DocumentPatientUpload({ open, onOpenChange }: DocumentPatientUpl
   };
 
   const extractTextFromRTF = async (file: File): Promise<string> => {
-    const text = await file.text();
-    
-    // Basic RTF to plain text conversion
-    let plainText = text
-      // Remove RTF header and control words
-      .replace(/\{\\rtf[^}]*\}/g, '')
-      .replace(/\\[a-z]+\d*\s?/gi, '')
-      // Remove curly braces groups
-      .replace(/\{[^{}]*\}/g, '')
-      // Remove remaining braces
-      .replace(/[{}]/g, '')
-      // Convert RTF line breaks to newlines
-      .replace(/\\par\s?/g, '\n')
-      .replace(/\\line\s?/g, '\n')
-      // Remove hex characters
-      .replace(/\\'[0-9a-f]{2}/gi, '')
-      // Clean up whitespace
-      .replace(/\s+/g, ' ')
-      .trim();
-    
-    return plainText;
+    const rtfContent = await file.text();
+    // Use the enhanced RTF parser for complex medical documents
+    return parseRTF(rtfContent);
   };
 
   const processFile = async (file: File, id: string): Promise<Partial<ExtractedPatient>> => {
