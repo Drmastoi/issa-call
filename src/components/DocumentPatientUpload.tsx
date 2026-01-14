@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Upload, FileText, Check, X, Loader2, AlertCircle, File } from "lucide-react";
+import { Upload, FileText, Check, X, Loader2, AlertCircle, File, FolderOpen, CheckCircle2, XCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import * as pdfjsLib from "pdfjs-dist";
 import { parseRTF } from "@/lib/rtf-parser";
 
@@ -42,6 +43,8 @@ export function DocumentPatientUpload({ open, onOpenChange }: DocumentPatientUpl
   const [patients, setPatients] = useState<ExtractedPatient[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processedCount, setProcessedCount] = useState(0);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
   const addPatientsMutation = useMutation({
@@ -83,7 +86,6 @@ export function DocumentPatientUpload({ open, onOpenChange }: DocumentPatientUpl
 
   const extractTextFromRTF = async (file: File): Promise<string> => {
     const rtfContent = await file.text();
-    // Use the enhanced RTF parser for complex medical documents
     return parseRTF(rtfContent);
   };
 
@@ -116,7 +118,6 @@ export function DocumentPatientUpload({ open, onOpenChange }: DocumentPatientUpl
         };
       }
 
-      // The edge function returns { success, data: { name, phone_number, nhs_number } }
       const patientData = data.data || data;
       
       if (!patientData.name && !patientData.phone_number && !patientData.nhs_number) {
@@ -141,14 +142,20 @@ export function DocumentPatientUpload({ open, onOpenChange }: DocumentPatientUpl
     }
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
+  const processFiles = async (files: FileList | File[]) => {
+    const fileArray = Array.from(files).filter(file => {
+      const name = file.name.toLowerCase();
+      return name.endsWith('.pdf') || name.endsWith('.rtf');
+    });
+
+    if (fileArray.length === 0) {
+      toast.error("No PDF or RTF files found");
+      return;
+    }
 
     setIsProcessing(true);
     setProcessedCount(0);
 
-    const fileArray = Array.from(files);
     const initialPatients: ExtractedPatient[] = fileArray.map((file, index) => ({
       id: `patient-${Date.now()}-${index}`,
       name: "",
@@ -181,6 +188,12 @@ export function DocumentPatientUpload({ open, onOpenChange }: DocumentPatientUpl
     }
 
     setIsProcessing(false);
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    await processFiles(files);
     event.target.value = "";
   };
 
@@ -225,7 +238,9 @@ export function DocumentPatientUpload({ open, onOpenChange }: DocumentPatientUpl
   };
 
   const successfulPatients = patients.filter((p) => p.status === "success");
+  const failedPatients = patients.filter((p) => p.status === "error");
   const selectedCount = patients.filter((p) => p.selected).length;
+  const progressPercentage = patients.length > 0 ? (processedCount / patients.length) * 100 : 0;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -233,44 +248,97 @@ export function DocumentPatientUpload({ open, onOpenChange }: DocumentPatientUpl
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            Bulk Patient Summary Upload
+            Batch Patient Summary Upload
           </DialogTitle>
           <DialogDescription>
-            Upload PDF or RTF patient summaries to extract and add patient information in bulk.
+            Upload multiple PDF or RTF patient summaries, or select an entire folder for batch processing.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           {/* Upload Area */}
-          <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
-            <input
-              type="file"
-              accept=".pdf,.rtf"
-              multiple
-              onChange={handleFileUpload}
-              className="hidden"
-              id="document-upload"
-              disabled={isProcessing}
-            />
-            <label
-              htmlFor="document-upload"
-              className="cursor-pointer flex flex-col items-center gap-2"
-            >
-              <Upload className="h-10 w-10 text-muted-foreground" />
-              <span className="text-sm font-medium">
-                Click to upload PDF or RTF files
-              </span>
-              <span className="text-xs text-muted-foreground">
-                Supports multiple files • PDF and RTF formats
-              </span>
-            </label>
+          <div className="grid grid-cols-2 gap-4">
+            {/* File Upload */}
+            <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.rtf"
+                multiple
+                onChange={handleFileUpload}
+                className="hidden"
+                id="document-upload"
+                disabled={isProcessing}
+              />
+              <label
+                htmlFor="document-upload"
+                className="cursor-pointer flex flex-col items-center gap-2"
+              >
+                <Upload className="h-8 w-8 text-muted-foreground" />
+                <span className="text-sm font-medium">Upload Files</span>
+                <span className="text-xs text-muted-foreground">
+                  Select multiple PDF/RTF files
+                </span>
+              </label>
+            </div>
+
+            {/* Folder Upload */}
+            <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
+              <input
+                ref={folderInputRef}
+                type="file"
+                onChange={handleFileUpload}
+                className="hidden"
+                id="folder-upload"
+                disabled={isProcessing}
+                {...{ webkitdirectory: "", directory: "" } as any}
+              />
+              <label
+                htmlFor="folder-upload"
+                className="cursor-pointer flex flex-col items-center gap-2"
+              >
+                <FolderOpen className="h-8 w-8 text-muted-foreground" />
+                <span className="text-sm font-medium">Upload Folder</span>
+                <span className="text-xs text-muted-foreground">
+                  Process all RTF/PDF in folder
+                </span>
+              </label>
+            </div>
           </div>
 
           {/* Processing Progress */}
           {isProcessing && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Processing {processedCount} of {patients.length} documents...
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Processing documents...
+                </div>
+                <span className="font-medium">
+                  {processedCount} / {patients.length}
+                </span>
+              </div>
+              <Progress value={progressPercentage} className="h-2" />
+            </div>
+          )}
+
+          {/* Summary Stats */}
+          {patients.length > 0 && !isProcessing && (
+            <div className="flex items-center gap-4 p-3 bg-muted/50 rounded-lg">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">{patients.length} files processed</span>
+              </div>
+              <div className="flex items-center gap-2 text-success">
+                <CheckCircle2 className="h-4 w-4" />
+                <span className="text-sm">{successfulPatients.length} successful</span>
+              </div>
+              {failedPatients.length > 0 && (
+                <div className="flex items-center gap-2 text-destructive">
+                  <XCircle className="h-4 w-4" />
+                  <span className="text-sm">{failedPatients.length} failed</span>
+                </div>
+              )}
             </div>
           )}
 
@@ -295,7 +363,7 @@ export function DocumentPatientUpload({ open, onOpenChange }: DocumentPatientUpl
                 </Badge>
               </div>
 
-              <ScrollArea className="h-[400px] rounded-md border">
+              <ScrollArea className="h-[350px] rounded-md border">
                 <div className="p-4 space-y-3">
                   {patients.map((patient) => (
                     <div
@@ -328,7 +396,7 @@ export function DocumentPatientUpload({ open, onOpenChange }: DocumentPatientUpl
                         <div className="flex-1 space-y-2">
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <File className="h-3 w-3" />
-                            <span className="truncate">{patient.fileName}</span>
+                            <span className="truncate max-w-[300px]">{patient.fileName}</span>
                             <Badge variant="secondary" className="text-xs">
                               {patient.fileType.toUpperCase()}
                             </Badge>
