@@ -428,21 +428,35 @@ export type Database = {
       }
       patients: {
         Row: {
+          ai_extracted_at: string | null
+          ai_extracted_summary: string | null
+          allergies: string[] | null
+          care_home_name: string | null
           cha2ds2_vasc_score: number | null
           cholesterol_date: string | null
           cholesterol_hdl: number | null
           cholesterol_ldl: number | null
+          communication_needs: string | null
           conditions: string[] | null
           created_at: string
           created_by: string | null
           date_of_birth: string | null
+          dietary_requirements: string | null
+          dnacpr_date: string | null
+          dnacpr_status: string | null
           frailty_status: string | null
+          gp_name: string | null
+          gp_practice: string | null
           hba1c_date: string | null
           hba1c_mmol_mol: number | null
           id: string
           last_review_date: string | null
           medications: string[] | null
+          mobility_status: string | null
           name: string
+          next_of_kin_name: string | null
+          next_of_kin_phone: string | null
+          next_of_kin_relationship: string | null
           nhs_number: string | null
           notes: string | null
           phone_number: string
@@ -450,21 +464,35 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ai_extracted_at?: string | null
+          ai_extracted_summary?: string | null
+          allergies?: string[] | null
+          care_home_name?: string | null
           cha2ds2_vasc_score?: number | null
           cholesterol_date?: string | null
           cholesterol_hdl?: number | null
           cholesterol_ldl?: number | null
+          communication_needs?: string | null
           conditions?: string[] | null
           created_at?: string
           created_by?: string | null
           date_of_birth?: string | null
+          dietary_requirements?: string | null
+          dnacpr_date?: string | null
+          dnacpr_status?: string | null
           frailty_status?: string | null
+          gp_name?: string | null
+          gp_practice?: string | null
           hba1c_date?: string | null
           hba1c_mmol_mol?: number | null
           id?: string
           last_review_date?: string | null
           medications?: string[] | null
+          mobility_status?: string | null
           name: string
+          next_of_kin_name?: string | null
+          next_of_kin_phone?: string | null
+          next_of_kin_relationship?: string | null
           nhs_number?: string | null
           notes?: string | null
           phone_number: string
@@ -472,21 +500,35 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ai_extracted_at?: string | null
+          ai_extracted_summary?: string | null
+          allergies?: string[] | null
+          care_home_name?: string | null
           cha2ds2_vasc_score?: number | null
           cholesterol_date?: string | null
           cholesterol_hdl?: number | null
           cholesterol_ldl?: number | null
+          communication_needs?: string | null
           conditions?: string[] | null
           created_at?: string
           created_by?: string | null
           date_of_birth?: string | null
+          dietary_requirements?: string | null
+          dnacpr_date?: string | null
+          dnacpr_status?: string | null
           frailty_status?: string | null
+          gp_name?: string | null
+          gp_practice?: string | null
           hba1c_date?: string | null
           hba1c_mmol_mol?: number | null
           id?: string
           last_review_date?: string | null
           medications?: string[] | null
+          mobility_status?: string | null
           name?: string
+          next_of_kin_name?: string | null
+          next_of_kin_phone?: string | null
+          next_of_kin_relationship?: string | null
           nhs_number?: string | null
           notes?: string | null
           phone_number?: string
