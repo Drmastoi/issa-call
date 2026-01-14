@@ -1,6 +1,7 @@
 import { Outlet, Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { AppSidebar } from './AppSidebar';
+import { AIChatAgent } from '@/components/chat/AIChatAgent';
 
 export function AppLayout() {
   const { user, loading } = useAuth();
@@ -23,6 +24,7 @@ export function AppLayout() {
       <main className="flex-1 overflow-auto">
         <Outlet />
       </main>
+      <AIChatAgent />
     </div>
   );
 }
