@@ -10,11 +10,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Upload, Search, Trash2, Edit, FileSpreadsheet, Phone, Loader2, Activity, FileText } from 'lucide-react';
+import { Plus, Upload, Search, Trash2, Edit, FileSpreadsheet, Phone, Loader2, Activity, FileText, User } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { CallStatusMonitor } from '@/components/CallStatusMonitor';
 import { HealthMetricsSummary } from '@/components/HealthMetricsSummary';
 import { DocumentPatientUpload } from '@/components/DocumentPatientUpload';
+import { PatientDetailPanel } from '@/components/patient/PatientDetailPanel';
 
 interface Patient {
   id: string;
@@ -36,6 +37,7 @@ export default function Patients() {
   const [activeCallId, setActiveCallId] = useState<string | null>(null);
   const [activeCallPatientName, setActiveCallPatientName] = useState<string | undefined>(undefined);
   const [metricsPatient, setMetricsPatient] = useState<Patient | null>(null);
+  const [detailPatientId, setDetailPatientId] = useState<string | null>(null);
   const { user } = useAuth();
   const { logAction } = useAuditLog();
   const { toast } = useToast();
@@ -287,6 +289,13 @@ export default function Patients() {
         onClose={() => setMetricsPatient(null)}
       />
     )}
+    {detailPatientId && (
+      <PatientDetailPanel
+        patientId={detailPatientId}
+        isOpen={!!detailPatientId}
+        onClose={() => setDetailPatientId(null)}
+      />
+    )}
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -447,6 +456,14 @@ Jane Doe,07700900456,,Afternoon`}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setDetailPatientId(patient.id)}
+                          title="View patient details"
+                        >
+                          <User className="h-4 w-4 text-blue-600" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
