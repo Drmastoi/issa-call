@@ -19,7 +19,7 @@ const navItems = [{
   href: '/patients'
 }, {
   icon: Calendar,
-  label: 'Batches',
+  label: 'Batch Calls',
   href: '/batches'
 }, {
   icon: Phone,
