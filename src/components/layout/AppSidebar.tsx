@@ -1,15 +1,18 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Calendar, Phone, FileDown, Settings, LogOut, ChevronLeft, ChevronRight, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Phone, FileDown, Settings, LogOut, ChevronLeft, ChevronRight, ClipboardList, Brain } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useState } from 'react';
-import issaCareLogo from '@/assets/issa-care-logo.jpg';
 
 const navItems = [{
   icon: LayoutDashboard,
   label: 'Dashboard',
   href: '/dashboard'
+}, {
+  icon: Brain,
+  label: 'AI Analytics',
+  href: '/ai-analytics'
 }, {
   icon: Users,
   label: 'Patients',
