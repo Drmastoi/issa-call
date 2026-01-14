@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -12,11 +12,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Calendar, Users, Play, Pause, Trash2, Eye, Pencil, X, Search } from 'lucide-react';
+import { Plus, Calendar, Users, Play, Pause, Trash2, Eye, Pencil, X, Search, Upload } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useMemo } from 'react';
 import { BatchSummaryView } from '@/components/batch/BatchSummaryView';
+import { CreateBatchFromUpload } from '@/components/batch/CreateBatchFromUpload';
+import { BatchExport } from '@/components/batch/BatchExport';
 
 interface Batch {
   id: string;
@@ -37,6 +38,7 @@ interface Patient {
 
 export default function Batches() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [viewBatchId, setViewBatchId] = useState<string | null>(null);
   const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
@@ -361,13 +363,18 @@ export default function Batches() {
           <h1 className="text-3xl font-bold text-foreground">Call Batches</h1>
           <p className="text-muted-foreground mt-1">Schedule and manage patient call batches</p>
         </div>
-        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Batch
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setUploadDialogOpen(true)}>
+            <Upload className="h-4 w-4 mr-2" />
+            Upload from EMIS
+          </Button>
+          <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Batch
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Create New Batch</DialogTitle>
@@ -478,8 +485,10 @@ export default function Batches() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
+      <CreateBatchFromUpload open={uploadDialogOpen} onOpenChange={setUploadDialogOpen} />
       {/* Batches Table */}
       <Card>
         <CardHeader>

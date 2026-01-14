@@ -138,37 +138,46 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          custom_questions: string[] | null
           id: string
           name: string
+          purpose: string | null
           retry_attempts: number
           scheduled_date: string
           scheduled_time_end: string
           scheduled_time_start: string
           status: string
+          target_qof_indicators: string[] | null
           updated_at: string
         }
         Insert: {
           created_at?: string
           created_by?: string | null
+          custom_questions?: string[] | null
           id?: string
           name: string
+          purpose?: string | null
           retry_attempts?: number
           scheduled_date: string
           scheduled_time_end?: string
           scheduled_time_start?: string
           status?: string
+          target_qof_indicators?: string[] | null
           updated_at?: string
         }
         Update: {
           created_at?: string
           created_by?: string | null
+          custom_questions?: string[] | null
           id?: string
           name?: string
+          purpose?: string | null
           retry_attempts?: number
           scheduled_date?: string
           scheduled_time_end?: string
           scheduled_time_start?: string
           status?: string
+          target_qof_indicators?: string[] | null
           updated_at?: string
         }
         Relationships: []

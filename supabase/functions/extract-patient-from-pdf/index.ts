@@ -27,22 +27,45 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const prompt = `Extract patient information from this medical summary document. Look for:
+const prompt = `Extract patient information and clinical data from this medical summary document. Look for:
+
+PATIENT DETAILS:
 1. Patient name (full name)
 2. Phone number (UK format preferred)
 3. NHS number (if present)
+4. Date of birth (format: YYYY-MM-DD)
+
+CLINICAL DATA:
+5. Conditions/diagnoses (diabetes, hypertension, COPD, asthma, CHD, AF, stroke, mental health conditions, etc.)
+6. Current smoking status (current smoker, ex-smoker, never smoked, unknown)
+7. Last HbA1c value (mmol/mol) and date if present
+8. Last blood pressure reading (systolic/diastolic) and date if present
+9. Medications list (active medications)
+10. Frailty status if mentioned (mild, moderate, severe)
+11. Alcohol units per week if mentioned
 
 Document content:
-${pdfText.substring(0, 8000)}
+${pdfText.substring(0, 12000)}
 
 Respond ONLY with valid JSON in this exact format (no markdown, no explanation):
 {
   "name": "extracted full name or null if not found",
   "phone_number": "extracted phone number or null if not found",
-  "nhs_number": "extracted NHS number or null if not found"
+  "nhs_number": "extracted NHS number or null if not found",
+  "date_of_birth": "YYYY-MM-DD or null if not found",
+  "conditions": ["array of condition names"] or [],
+  "smoking_status": "current_smoker|ex_smoker|never_smoked|unknown",
+  "hba1c_mmol_mol": number or null,
+  "hba1c_date": "YYYY-MM-DD or null",
+  "blood_pressure_systolic": number or null,
+  "blood_pressure_diastolic": number or null,
+  "bp_date": "YYYY-MM-DD or null",
+  "medications": ["array of medication names"] or [],
+  "frailty_status": "mild|moderate|severe or null",
+  "alcohol_units_per_week": number or null
 }
 
-If you cannot find a field, use null. For phone numbers, try to format as UK mobile (+44...) if possible.`;
+If you cannot find a field, use null or empty array. For phone numbers, try to format as UK mobile (+44...) if possible.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -100,6 +123,17 @@ If you cannot find a field, use null. For phone numbers, try to format as UK mob
           name: extracted.name || null,
           phone_number: extracted.phone_number || null,
           nhs_number: extracted.nhs_number || null,
+          date_of_birth: extracted.date_of_birth || null,
+          conditions: extracted.conditions || [],
+          smoking_status: extracted.smoking_status || null,
+          hba1c_mmol_mol: extracted.hba1c_mmol_mol || null,
+          hba1c_date: extracted.hba1c_date || null,
+          blood_pressure_systolic: extracted.blood_pressure_systolic || null,
+          blood_pressure_diastolic: extracted.blood_pressure_diastolic || null,
+          bp_date: extracted.bp_date || null,
+          medications: extracted.medications || [],
+          frailty_status: extracted.frailty_status || null,
+          alcohol_units_per_week: extracted.alcohol_units_per_week || null,
         }
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
