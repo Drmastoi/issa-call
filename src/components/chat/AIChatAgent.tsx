@@ -70,7 +70,7 @@ export function AIChatAgent() {
     return (
       <Button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 h-12 px-4 rounded-full shadow-lg z-50 gap-2 animate-pulse hover:animate-none"
+        className="fixed bottom-6 right-6 h-12 px-4 rounded-full shadow-lg z-50 gap-2"
         title="Press Ctrl+K to open"
       >
         <MessageCircle className="h-5 w-5" />
