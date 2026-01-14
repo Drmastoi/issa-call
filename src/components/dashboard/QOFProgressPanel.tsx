@@ -1,4 +1,4 @@
-import { FileText, Target, TrendingUp, Download } from "lucide-react";
+import { FileText, Target, TrendingUp, ChartBar } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -56,7 +56,7 @@ export function QOFProgressPanel() {
 
   if (isLoading) {
     return (
-      <Card>
+      <Card className="h-full">
         <CardHeader>
           <CardTitle className="text-sm font-medium">QOF Progress</CardTitle>
         </CardHeader>
@@ -89,71 +89,65 @@ export function QOFProgressPanel() {
     : 0;
 
   return (
-    <Card>
+    <Card className="h-full shadow-sm hover:shadow-md transition-shadow">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <Target className="h-4 w-4 text-primary" />
-            QOF Indicators
+            <div className="p-1.5 rounded-lg bg-primary/10">
+              <Target className="h-4 w-4 text-primary" />
+            </div>
+            QOF Progress
           </CardTitle>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => navigate('/ai-analytics')}
-          >
-            <FileText className="h-4 w-4 mr-1" />
-            Reports
-          </Button>
         </div>
-        {/* Overall score */}
-        <div className="flex items-center gap-3 mt-2 p-2 rounded-md bg-muted/50">
-          <TrendingUp className="h-5 w-5 text-primary" />
-          <div className="flex-1">
-            <p className="text-xs text-muted-foreground">Overall QOF Score</p>
-            <p className="text-lg font-bold">{Math.round(overallScore)}%</p>
+        {/* Overall score - Compact */}
+        <div className="flex items-center justify-between mt-3 p-2.5 rounded-lg bg-gradient-to-r from-primary/10 to-primary/5">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-primary" />
+            <span className="text-xs text-muted-foreground">Overall Score</span>
           </div>
-          <Badge variant={overallScore >= 75 ? 'default' : overallScore >= 50 ? 'secondary' : 'destructive'}>
-            {overallScore >= 75 ? 'On Target' : overallScore >= 50 ? 'Needs Work' : 'Below Target'}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-bold">{Math.round(overallScore)}%</span>
+            <Badge 
+              variant={overallScore >= 75 ? 'default' : overallScore >= 50 ? 'secondary' : 'destructive'}
+              className="text-xs"
+            >
+              {overallScore >= 75 ? 'On Track' : overallScore >= 50 ? 'Needs Work' : 'Below'}
+            </Badge>
+          </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3 pt-0">
         <TooltipProvider>
-          {displayIndicators.map((indicator) => {
+          {displayIndicators.slice(0, 3).map((indicator) => {
             const coverage = getCoverageData(indicator.id);
             const { percent, status } = calculateProgress(coverage.recorded, coverage.total, indicator.targetPercent);
             
             return (
               <Tooltip key={indicator.id}>
                 <TooltipTrigger asChild>
-                  <div className="space-y-1.5 cursor-help">
+                  <div className="space-y-1.5 cursor-help p-2 rounded-lg hover:bg-muted/50 transition-colors -mx-2">
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
-                        <span className="font-medium truncate max-w-[120px]">{indicator.name}</span>
-                        <Badge variant="outline" className="text-xs font-mono">
+                        <span className="font-medium text-xs truncate max-w-[100px]">{indicator.name}</span>
+                        <Badge variant="outline" className="text-[10px] font-mono px-1">
                           {indicator.code}
                         </Badge>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">
-                          {coverage.recorded}/{coverage.total}
-                        </span>
-                        <Badge 
-                          variant={status === 'good' ? 'default' : status === 'warning' ? 'secondary' : 'destructive'}
-                          className="min-w-[3rem] justify-center"
-                        >
-                          {percent}%
-                        </Badge>
-                      </div>
+                      <Badge 
+                        variant={status === 'good' ? 'default' : status === 'warning' ? 'secondary' : 'destructive'}
+                        className="text-xs min-w-[2.5rem] justify-center"
+                      >
+                        {percent}%
+                      </Badge>
                     </div>
                     <div className="relative">
                       <Progress 
                         value={percent} 
                         className={cn(
-                          "h-2",
-                          status === 'good' && "[&>div]:bg-green-500",
-                          status === 'warning' && "[&>div]:bg-yellow-500",
-                          status === 'poor' && "[&>div]:bg-red-500"
+                          "h-1.5",
+                          status === 'good' && "[&>div]:bg-success",
+                          status === 'warning' && "[&>div]:bg-warning",
+                          status === 'poor' && "[&>div]:bg-destructive"
                         )}
                       />
                       {/* Target line indicator */}
@@ -162,14 +156,12 @@ export function QOFProgressPanel() {
                         style={{ left: `${indicator.targetPercent}%` }}
                       />
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Target: {indicator.targetPercent}%
-                    </p>
                   </div>
                 </TooltipTrigger>
                 <TooltipContent side="left" className="max-w-xs">
                   <p className="font-medium">{indicator.name}</p>
                   <p className="text-xs text-muted-foreground mt-1">{indicator.description}</p>
+                  <p className="text-xs mt-1">Target: {indicator.targetPercent}% | Current: {coverage.recorded}/{coverage.total}</p>
                 </TooltipContent>
               </Tooltip>
             );
@@ -179,11 +171,11 @@ export function QOFProgressPanel() {
         <Button 
           variant="outline" 
           size="sm" 
-          className="w-full"
+          className="w-full mt-2"
           onClick={() => navigate('/ai-analytics')}
         >
-          <Download className="h-4 w-4 mr-2" />
-          View Full QOF Analytics
+          <ChartBar className="h-4 w-4 mr-2" />
+          View Analytics
         </Button>
       </CardContent>
     </Card>
