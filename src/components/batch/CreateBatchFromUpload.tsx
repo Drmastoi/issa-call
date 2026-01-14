@@ -332,7 +332,7 @@ export function CreateBatchFromUpload({ open, onOpenChange }: CreateBatchFromUpl
           ))}
         </div>
 
-        <ScrollArea className="flex-1 pr-4">
+        <ScrollArea className="flex-1 pr-4 min-h-0">
           {step === 1 && (
             <div className="space-y-6 py-4">
               <div className="border-2 border-dashed rounded-lg p-8 text-center">
@@ -361,9 +361,6 @@ export function CreateBatchFromUpload({ open, onOpenChange }: CreateBatchFromUpl
               {patients.length > 0 && !isProcessing && (
                 <div className="space-y-2">
                   <p className="font-medium">Extracted {validCount} valid patients from {patients.length} files</p>
-                  <Button onClick={() => setStep(2)} disabled={validCount === 0}>
-                    Review Patients →
-                  </Button>
                 </div>
               )}
             </div>
@@ -406,9 +403,12 @@ export function CreateBatchFromUpload({ open, onOpenChange }: CreateBatchFromUpl
                             <p>📞 {patient.phone_number || "No phone"} | 🏥 NHS: {patient.nhs_number || "N/A"}</p>
                             {patient.conditions.length > 0 && (
                               <div className="flex flex-wrap gap-1">
-                                {patient.conditions.map((c, i) => (
+                                {patient.conditions.slice(0, 5).map((c, i) => (
                                   <Badge key={i} variant="secondary" className="text-xs">{c}</Badge>
                                 ))}
+                                {patient.conditions.length > 5 && (
+                                  <Badge variant="outline" className="text-xs">+{patient.conditions.length - 5} more</Badge>
+                                )}
                               </div>
                             )}
                             {patient.smoking_status && (
@@ -424,35 +424,6 @@ export function CreateBatchFromUpload({ open, onOpenChange }: CreateBatchFromUpl
                     </CardContent>
                   </Card>
                 ))}
-              </div>
-
-              <div className="flex gap-2 pointer-events-auto">
-                <Button
-                  variant="outline"
-                  type="button"
-                  className="pointer-events-auto"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setStep(1);
-                  }}
-                >
-                  ← Back
-                </Button>
-                <Button
-                  type="button"
-                  className="pointer-events-auto"
-                  onPointerDownCapture={() => console.log("Configure pointerdown")}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    console.log("Configure Batch clicked", { selectedCount, validCount, step });
-                    setStep(3);
-                  }}
-                  disabled={selectedCount === 0}
-                >
-                  Configure Batch →
-                </Button>
               </div>
             </div>
           )}
@@ -541,26 +512,47 @@ export function CreateBatchFromUpload({ open, onOpenChange }: CreateBatchFromUpl
                   </div>
                 </CardContent>
               </Card>
-
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setStep(2)}>← Back</Button>
-                <Button 
-                  onClick={() => createBatchMutation.mutate()}
-                  disabled={createBatchMutation.isPending}
-                >
-                  {createBatchMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    "Create Batch"
-                  )}
-                </Button>
-              </div>
             </div>
           )}
         </ScrollArea>
+
+        {/* Fixed Footer Navigation */}
+        <div className="flex justify-between items-center pt-4 border-t mt-auto bg-background">
+          <div>
+            {step > 1 && (
+              <Button variant="outline" onClick={() => setStep((step - 1) as 1 | 2 | 3)}>
+                ← Back
+              </Button>
+            )}
+          </div>
+          <div>
+            {step === 1 && patients.length > 0 && !isProcessing && (
+              <Button onClick={() => setStep(2)} disabled={validCount === 0}>
+                Review Patients →
+              </Button>
+            )}
+            {step === 2 && (
+              <Button onClick={() => setStep(3)} disabled={selectedCount === 0}>
+                Configure Batch →
+              </Button>
+            )}
+            {step === 3 && (
+              <Button 
+                onClick={() => createBatchMutation.mutate()}
+                disabled={createBatchMutation.isPending}
+              >
+                {createBatchMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  "Create Batch"
+                )}
+              </Button>
+            )}
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );
