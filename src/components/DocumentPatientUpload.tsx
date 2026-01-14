@@ -116,7 +116,10 @@ export function DocumentPatientUpload({ open, onOpenChange }: DocumentPatientUpl
         };
       }
 
-      if (!data.name && !data.phone_number && !data.nhs_number) {
+      // The edge function returns { success, data: { name, phone_number, nhs_number } }
+      const patientData = data.data || data;
+      
+      if (!patientData.name && !patientData.phone_number && !patientData.nhs_number) {
         return {
           status: "error",
           error: "No patient information found in document",
@@ -124,9 +127,9 @@ export function DocumentPatientUpload({ open, onOpenChange }: DocumentPatientUpl
       }
 
       return {
-        name: data.name || "",
-        phone_number: data.phone_number || "",
-        nhs_number: data.nhs_number || "",
+        name: patientData.name || "",
+        phone_number: patientData.phone_number || "",
+        nhs_number: patientData.nhs_number || "",
         status: "success",
         fileType,
       };
