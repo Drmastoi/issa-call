@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -23,6 +23,22 @@ export function AIChatAgent() {
   const { messages, isLoading, sendMessage, clearMessages } = useAIChat();
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Keyboard shortcut handler
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      setIsOpen(prev => !prev);
+    }
+    if (e.key === 'Escape' && isOpen) {
+      setIsOpen(false);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -54,10 +70,14 @@ export function AIChatAgent() {
     return (
       <Button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 h-12 px-4 rounded-full shadow-lg z-50 gap-2"
+        className="fixed bottom-6 right-6 h-12 px-4 rounded-full shadow-lg z-50 gap-2 animate-pulse hover:animate-none"
+        title="Press Ctrl+K to open"
       >
         <MessageCircle className="h-5 w-5" />
         <span className="font-medium">Ask AI</span>
+        <kbd className="hidden sm:inline-flex ml-1 px-1.5 py-0.5 text-[10px] font-mono bg-primary-foreground/20 rounded">
+          ⌘K
+        </kbd>
       </Button>
     );
   }
