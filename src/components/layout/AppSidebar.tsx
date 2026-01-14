@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Calendar, Phone, FileDown, Settings, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Phone, FileDown, Settings, LogOut, ChevronLeft, ChevronRight, ClipboardList } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -24,6 +24,10 @@ const navItems = [{
   icon: FileDown,
   label: 'Export',
   href: '/export'
+}, {
+  icon: ClipboardList,
+  label: 'MediTask',
+  href: '/meditask'
 }, {
   icon: Settings,
   label: 'Settings',
