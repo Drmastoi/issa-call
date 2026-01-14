@@ -14,7 +14,7 @@ import { Plus, Upload, Search, Trash2, Edit, FileSpreadsheet, Phone, Loader2, Ac
 import { Textarea } from '@/components/ui/textarea';
 import { CallStatusMonitor } from '@/components/CallStatusMonitor';
 import { HealthMetricsSummary } from '@/components/HealthMetricsSummary';
-import { PDFPatientUpload } from '@/components/PDFPatientUpload';
+import { DocumentPatientUpload } from '@/components/DocumentPatientUpload';
 
 interface Patient {
   id: string;
@@ -296,9 +296,9 @@ export default function Patients() {
         <div className="flex gap-3">
           <Button variant="outline" onClick={() => setPdfUploadOpen(true)}>
             <FileText className="h-4 w-4 mr-2" />
-            Upload PDF
+            Upload Documents
           </Button>
-          <PDFPatientUpload open={pdfUploadOpen} onOpenChange={setPdfUploadOpen} />
+          <DocumentPatientUpload open={pdfUploadOpen} onOpenChange={setPdfUploadOpen} />
           
           <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
             <DialogTrigger asChild>
