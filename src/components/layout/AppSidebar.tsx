@@ -35,7 +35,7 @@ const navItems = [{
   href: '/meditask'
 }, {
   icon: Settings,
-  label: 'Settings',
+  label: 'Profile',
   href: '/settings'
 }];
 
