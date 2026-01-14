@@ -44,20 +44,8 @@ export function AppSidebar() {
   } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   return <aside className={cn("h-screen bg-sidebar flex flex-col border-r border-sidebar-border transition-all duration-300", collapsed ? "w-16" : "w-64")}>
-      {/* Header with Logo */}
-      <div className="p-4 flex items-center justify-center border-b border-sidebar-border">
-        {!collapsed ? (
-          <img 
-            src={issaCareLogo} 
-            alt="ISSA.CARE" 
-            className="h-10 object-contain"
-          />
-        ) : (
-          <div className="p-2 bg-sidebar-primary rounded-lg">
-            <Phone className="h-5 w-5 text-sidebar-primary-foreground" />
-          </div>
-        )}
-      </div>
+      {/* Header spacer */}
+      <div className="p-4 border-b border-sidebar-border" />
 
       {/* Navigation */}
       <nav className="flex-1 p-3 space-y-1">
