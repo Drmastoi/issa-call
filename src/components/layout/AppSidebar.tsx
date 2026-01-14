@@ -36,7 +36,7 @@ const navItems = [{
 }, {
   icon: User,
   label: 'Profile',
-  href: '/settings'
+  href: '/profile'
 }];
 
 export function AppSidebar() {
