@@ -426,9 +426,31 @@ export function CreateBatchFromUpload({ open, onOpenChange }: CreateBatchFromUpl
                 ))}
               </div>
 
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setStep(1)}>← Back</Button>
-                <Button onClick={() => setStep(3)} disabled={selectedCount === 0}>
+              <div className="flex gap-2 pointer-events-auto">
+                <Button
+                  variant="outline"
+                  type="button"
+                  className="pointer-events-auto"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setStep(1);
+                  }}
+                >
+                  ← Back
+                </Button>
+                <Button
+                  type="button"
+                  className="pointer-events-auto"
+                  onPointerDownCapture={() => console.log("Configure pointerdown")}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log("Configure Batch clicked", { selectedCount, validCount, step });
+                    setStep(3);
+                  }}
+                  disabled={selectedCount === 0}
+                >
                   Configure Batch →
                 </Button>
               </div>
