@@ -36,7 +36,7 @@ const App = () => (
               <Route path="/batches" element={<Batches />} />
               <Route path="/calls" element={<Calls />} />
               <Route path="/export" element={<Export />} />
-              <Route path="/settings" element={<Settings />} />
+              <Route path="/profile" element={<Settings />} />
               <Route path="/qof-reports" element={<QOFReports />} />
               <Route path="/meditask" element={<MediTask />} />
             </Route>
