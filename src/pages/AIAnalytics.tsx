@@ -563,11 +563,18 @@ export default function AIAnalytics() {
         {/* Enhanced Header */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 animate-fade-in">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-gradient-to-br from-primary/20 to-primary/10 rounded-2xl shadow-sm">
-              <BarChart3 className="h-8 w-8 text-primary" />
+            <div className="relative p-3 bg-gradient-to-br from-primary/20 to-primary/10 rounded-2xl shadow-sm">
+              <Brain className="h-8 w-8 text-primary" />
+              <Sparkles className="absolute -top-1 -right-1 h-4 w-4 text-primary animate-pulse" />
             </div>
             <div>
-              <h1 className="text-2xl lg:text-3xl font-bold text-foreground">AI Analytics</h1>
+              <h1 className="text-2xl lg:text-3xl font-bold text-foreground flex items-center gap-2">
+                AI Analytics
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
+                  <Sparkles className="h-3 w-3 mr-1" />
+                  Powered by AI
+                </span>
+              </h1>
               <p className="text-muted-foreground">Quality and Outcomes Framework tracking & insights</p>
             </div>
           </div>
