@@ -27,7 +27,7 @@ const navItems = [{
   href: '/calls'
 }, {
   icon: FileDown,
-  label: 'Export',
+  label: 'Export Data',
   href: '/export'
 }, {
   icon: ClipboardList,
