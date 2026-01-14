@@ -8,6 +8,7 @@ import { AIInsightsPanel } from '@/components/dashboard/AIInsightsPanel';
 import { RiskAlertsWidget } from '@/components/dashboard/RiskAlertsWidget';
 import { QOFProgressPanel } from '@/components/dashboard/QOFProgressPanel';
 import { MediTaskWidget } from '@/components/dashboard/MediTaskWidget';
+import issaCareLogo from '@/assets/issa-care-logo.jpg';
 
 export default function Dashboard() {
   const { data: stats } = useQuery({
@@ -74,9 +75,16 @@ export default function Dashboard() {
 
   return (
     <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground mt-1">Overview of your patient call system</p>
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-muted-foreground mt-1">Overview of your patient call system</p>
+        </div>
+        <img 
+          src={issaCareLogo} 
+          alt="ISSA.CARE - Empowering Patients" 
+          className="h-12 object-contain"
+        />
       </div>
 
       {/* Stats Grid */}
