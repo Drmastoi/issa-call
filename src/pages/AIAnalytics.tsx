@@ -36,7 +36,9 @@ import {
   ChevronDown,
   ChevronRight,
   Info,
-  ListChecks
+  ListChecks,
+  Sparkles,
+  BarChart3
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { QOF_INDICATORS, QOF_CATEGORIES, calculateQOFProgress } from '@/lib/qof-codes';
@@ -302,14 +304,12 @@ export default function AIAnalytics() {
     // Calculate based on available data and patient conditions
     switch (indicator.code) {
       case 'SMOK002': {
-        // Smoking status recording for patients with LTCs
         const patientsWithLTC = patients.filter(p => p.conditions && p.conditions.length > 0);
         total = patientsWithLTC.length || patients.length;
         achieved = callResponses.filter(r => r.smoking_status).length;
         break;
       }
       case 'HYP008': {
-        // Hypertension BP control for under 80
         total = patientCohorts.hypertension.length;
         achieved = callResponses.filter(r => {
           if (!r.blood_pressure_systolic || !r.blood_pressure_diastolic) return false;
@@ -318,7 +318,6 @@ export default function AIAnalytics() {
         break;
       }
       case 'HYP009': {
-        // Hypertension BP control for 80+
         total = patientCohorts.hypertension.length;
         achieved = callResponses.filter(r => {
           if (!r.blood_pressure_systolic || !r.blood_pressure_diastolic) return false;
@@ -327,20 +326,17 @@ export default function AIAnalytics() {
         break;
       }
       case 'DM006': {
-        // Diabetes HbA1c ≤58
         total = patientCohorts.diabetes.length;
         achieved = patientCohorts.diabetes.filter(p => p.hba1c_mmol_mol && p.hba1c_mmol_mol <= 58).length;
         break;
       }
       case 'DM012': {
-        // Diabetes HbA1c ≤75 for frail patients
         const diabeticFrail = patientCohorts.diabetes.filter(p => p.frailty_status === 'moderate' || p.frailty_status === 'severe');
         total = diabeticFrail.length;
         achieved = diabeticFrail.filter(p => p.hba1c_mmol_mol && p.hba1c_mmol_mol <= 75).length;
         break;
       }
       case 'DM036': {
-        // Diabetes BP control
         total = patientCohorts.diabetes.length;
         achieved = callResponses.filter(r => {
           const isDiabetic = patientCohorts.diabetes.some(p => p.id === r.patient_id);
@@ -352,28 +348,24 @@ export default function AIAnalytics() {
       case 'CHOL003':
       case 'DM034':
       case 'DM035': {
-        // Statin prescription - check cholesterol data as proxy
         const relevantPatients = indicator.code.startsWith('DM') ? patientCohorts.diabetes : patientCohorts.chd;
         total = relevantPatients.length;
         achieved = relevantPatients.filter(p => p.cholesterol_ldl || p.cholesterol_hdl).length;
         break;
       }
       case 'CHOL004': {
-        // Cholesterol target met
         total = patientCohorts.chd.length + patientCohorts.stroke.length;
         achieved = patients.filter(p => p.cholesterol_ldl && p.cholesterol_ldl <= 2.0).length;
         break;
       }
       case 'AF007':
       case 'AF008': {
-        // AF anticoagulation
         total = patientCohorts.af.length;
         achieved = patientCohorts.af.filter(p => p.cha2ds2_vasc_score && p.cha2ds2_vasc_score >= 2).length;
         break;
       }
       case 'CHD015':
       case 'CHD016': {
-        // CHD BP control
         total = patientCohorts.chd.length;
         const target = indicator.ageGroup === 'over80' ? { sys: 150, dia: 90 } : { sys: 140, dia: 90 };
         achieved = callResponses.filter(r => {
@@ -385,7 +377,6 @@ export default function AIAnalytics() {
       }
       case 'STIA014':
       case 'STIA015': {
-        // Stroke/TIA BP control
         total = patientCohorts.stroke.length;
         const target = indicator.ageGroup === 'over80' ? { sys: 150, dia: 90 } : { sys: 140, dia: 90 };
         achieved = callResponses.filter(r => {
@@ -396,26 +387,22 @@ export default function AIAnalytics() {
         break;
       }
       case 'AST007': {
-        // Asthma review
         total = patientCohorts.asthma.length;
         achieved = aiSummaries.filter(s => patientCohorts.asthma.some(p => p.id === s.patient_id)).length;
         break;
       }
       case 'COPD010': {
-        // COPD FEV1
         total = patientCohorts.copd.length;
         achieved = aiSummaries.filter(s => patientCohorts.copd.some(p => p.id === s.patient_id)).length;
         break;
       }
       case 'MH002':
       case 'DEM004': {
-        // Mental health care plans / dementia review
         total = patientCohorts.mentalHealth.length;
         achieved = aiSummaries.filter(s => patientCohorts.mentalHealth.some(p => p.id === s.patient_id)).length;
         break;
       }
       default: {
-        // For other indicators, use available call response data
         achieved = callResponses.length > 0 ? Math.min(callResponses.length, total) : 0;
       }
     }
@@ -551,183 +538,237 @@ export default function AIAnalytics() {
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
-      case 'critical': return 'text-destructive bg-destructive/10';
-      case 'high': return 'text-warning bg-warning/10';
-      default: return 'text-muted-foreground bg-muted';
+      case 'critical': return 'border-destructive/30 bg-destructive/5';
+      case 'high': return 'border-warning/30 bg-warning/5';
+      default: return 'border-muted bg-muted/30';
     }
   };
 
   const getStatusColor = (status: 'good' | 'warning' | 'poor') => {
     switch (status) {
-      case 'good': return 'text-green-600';
-      case 'warning': return 'text-amber-500';
-      case 'poor': return 'text-red-500';
+      case 'good': return 'text-success';
+      case 'warning': return 'text-warning';
+      case 'poor': return 'text-destructive';
     }
   };
 
+  // Calculate overall QOF score
+  const overallQOFScore = groupedIndicators.length > 0
+    ? Math.round(groupedIndicators.reduce((acc, cat) => acc + getCategoryScore(cat.indicators), 0) / groupedIndicators.length)
+    : 0;
+
   return (
     <TooltipProvider>
-      <div className="p-8 space-y-6">
-        {/* Header with Export Buttons */}
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <Brain className="h-6 w-6 text-primary" />
+      <div className="p-6 lg:p-8 space-y-6">
+        {/* Enhanced Header */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 animate-fade-in">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-gradient-to-br from-primary/20 to-primary/10 rounded-2xl shadow-sm">
+              <BarChart3 className="h-8 w-8 text-primary" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-foreground">QOF Analytics</h1>
-              <p className="text-muted-foreground">NHS Quality and Outcomes Framework tracking & patient analytics</p>
+              <h1 className="text-2xl lg:text-3xl font-bold text-foreground">QOF Analytics</h1>
+              <p className="text-muted-foreground">Quality and Outcomes Framework tracking & insights</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={exportFullReport}>
-              <Download className="h-4 w-4 mr-2" />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" onClick={exportFullReport} className="gap-2">
+              <Download className="h-4 w-4" />
               Summary
             </Button>
-            <Button variant="outline" size="sm" onClick={exportQOFProgress}>
-              <Download className="h-4 w-4 mr-2" />
-              Full QOF Report
+            <Button variant="outline" size="sm" onClick={exportQOFProgress} className="gap-2">
+              <Download className="h-4 w-4" />
+              Full Report
             </Button>
-            <Button variant="outline" size="sm" onClick={exportQOFGaps}>
-              <Download className="h-4 w-4 mr-2" />
+            <Button variant="outline" size="sm" onClick={exportQOFGaps} className="gap-2">
+              <Download className="h-4 w-4" />
               Gaps List
             </Button>
           </div>
         </div>
 
-        {/* KPI Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <Users className="h-4 w-4" />
-                <span className="text-xs">Total Patients</span>
+        {/* Overall Score + Quick Stats */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+          {/* Overall QOF Score - Featured Card */}
+          <Card className="lg:col-span-1 relative overflow-hidden border-0 shadow-lg animate-fade-in" style={{ animationDelay: '50ms' }}>
+            <div className="absolute inset-0 bg-gradient-to-br from-primary via-primary/90 to-primary/80" />
+            <CardContent className="relative pt-6 text-primary-foreground">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-white/20 rounded-lg">
+                  <Target className="h-5 w-5" />
+                </div>
+                <span className="text-sm font-medium opacity-90">Overall QOF Score</span>
               </div>
-              <p className="text-2xl font-bold">{kpis.totalPatients}</p>
+              <div className="flex items-end gap-2">
+                <span className="text-5xl font-bold">{overallQOFScore}</span>
+                <span className="text-2xl font-medium mb-1">%</span>
+              </div>
+              <Progress value={overallQOFScore} className="h-2 mt-4 bg-white/20 [&>div]:bg-white" />
+              <p className="text-xs mt-2 opacity-80">
+                {overallQOFScore >= 75 ? '✓ On track for QOF targets' : 'Action needed to meet targets'}
+              </p>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <Activity className="h-4 w-4" />
-                <span className="text-xs">With Data</span>
-              </div>
-              <p className="text-2xl font-bold">{kpis.patientsWithData}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <ClipboardList className="h-4 w-4" />
-                <span className="text-xs">Pending Tasks</span>
-              </div>
-              <p className="text-2xl font-bold">{kpis.pendingTasksCount}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2 text-destructive mb-1">
-                <AlertTriangle className="h-4 w-4" />
-                <span className="text-xs">High Priority</span>
-              </div>
-              <p className="text-2xl font-bold">{kpis.highPriorityTasks}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2 text-warning mb-1">
-                <FileWarning className="h-4 w-4" />
-                <span className="text-xs">Alerts</span>
-              </div>
-              <p className="text-2xl font-bold">{kpis.unresolvedAlerts}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2 text-green-600 mb-1">
-                <Target className="h-4 w-4" />
-                <span className="text-xs">Data Complete</span>
-              </div>
-              <p className="text-2xl font-bold">{kpis.dataCompleteness}%</p>
-            </CardContent>
-          </Card>
+
+          {/* KPI Stats Grid */}
+          <div className="lg:col-span-3 grid grid-cols-2 md:grid-cols-3 gap-4">
+            <Card className="relative overflow-hidden border-0 shadow-md hover:shadow-lg transition-all animate-fade-in" style={{ animationDelay: '100ms' }}>
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent" />
+              <CardContent className="pt-5 relative">
+                <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                  <Users className="h-4 w-4" />
+                  <span className="text-xs">Total Patients</span>
+                </div>
+                <p className="text-2xl font-bold">{kpis.totalPatients}</p>
+                <p className="text-xs text-muted-foreground mt-1">{kpis.patientsWithData} with data</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="relative overflow-hidden border-0 shadow-md hover:shadow-lg transition-all animate-fade-in" style={{ animationDelay: '150ms' }}>
+              <div className="absolute inset-0 bg-gradient-to-br from-success/10 via-success/5 to-transparent" />
+              <CardContent className="pt-5 relative">
+                <div className="flex items-center gap-2 text-success mb-1">
+                  <Target className="h-4 w-4" />
+                  <span className="text-xs">Data Complete</span>
+                </div>
+                <p className="text-2xl font-bold">{kpis.dataCompleteness}%</p>
+                <Progress value={kpis.dataCompleteness} className="h-1.5 mt-2" />
+              </CardContent>
+            </Card>
+
+            <Card className="relative overflow-hidden border-0 shadow-md hover:shadow-lg transition-all animate-fade-in" style={{ animationDelay: '200ms' }}>
+              <div className="absolute inset-0 bg-gradient-to-br from-accent/10 via-accent/5 to-transparent" />
+              <CardContent className="pt-5 relative">
+                <div className="flex items-center gap-2 text-accent mb-1">
+                  <Sparkles className="h-4 w-4" />
+                  <span className="text-xs">AI Summaries</span>
+                </div>
+                <p className="text-2xl font-bold">{kpis.aiSummariesGenerated}</p>
+                <p className="text-xs text-muted-foreground mt-1">Generated</p>
+              </CardContent>
+            </Card>
+
+            <Card className="relative overflow-hidden border-0 shadow-md hover:shadow-lg transition-all animate-fade-in" style={{ animationDelay: '250ms' }}>
+              <div className="absolute inset-0 bg-gradient-to-br from-warning/10 via-warning/5 to-transparent" />
+              <CardContent className="pt-5 relative">
+                <div className="flex items-center gap-2 text-warning mb-1">
+                  <ClipboardList className="h-4 w-4" />
+                  <span className="text-xs">Pending Tasks</span>
+                </div>
+                <p className="text-2xl font-bold">{kpis.pendingTasksCount}</p>
+                <p className="text-xs text-muted-foreground mt-1">{kpis.highPriorityTasks} high priority</p>
+              </CardContent>
+            </Card>
+
+            <Card className="relative overflow-hidden border-0 shadow-md hover:shadow-lg transition-all animate-fade-in" style={{ animationDelay: '300ms' }}>
+              <div className="absolute inset-0 bg-gradient-to-br from-destructive/10 via-destructive/5 to-transparent" />
+              <CardContent className="pt-5 relative">
+                <div className="flex items-center gap-2 text-destructive mb-1">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span className="text-xs">Active Alerts</span>
+                </div>
+                <p className="text-2xl font-bold">{kpis.unresolvedAlerts}</p>
+                <p className="text-xs text-muted-foreground mt-1">{kpis.criticalAlerts} critical</p>
+              </CardContent>
+            </Card>
+
+            <Card className="relative overflow-hidden border-0 shadow-md hover:shadow-lg transition-all animate-fade-in" style={{ animationDelay: '350ms' }}>
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent" />
+              <CardContent className="pt-5 relative">
+                <div className="flex items-center gap-2 text-primary mb-1">
+                  <Activity className="h-4 w-4" />
+                  <span className="text-xs">With Conditions</span>
+                </div>
+                <p className="text-2xl font-bold">{kpis.patientsWithConditions}</p>
+                <p className="text-xs text-muted-foreground mt-1">Tracked patients</p>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         {/* Patient Cohorts Overview */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
-              Patient Cohorts by Condition
-            </CardTitle>
-            <CardDescription>
-              Overview of patients by clinical condition for targeted QOF interventions
-            </CardDescription>
+        <Card className="shadow-sm animate-fade-in" style={{ animationDelay: '400ms' }}>
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Users className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <CardTitle>Patient Cohorts</CardTitle>
+                <CardDescription>Overview by clinical condition for targeted QOF interventions</CardDescription>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
-              <div className="p-3 border rounded-lg">
-                <div className="flex items-center gap-2 mb-1">
-                  <Heart className="h-4 w-4 text-red-500" />
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+              <div className="p-4 rounded-xl bg-gradient-to-br from-destructive/10 to-destructive/5 border border-destructive/20 hover:shadow-md transition-all">
+                <div className="flex items-center gap-2 mb-2">
+                  <Heart className="h-4 w-4 text-destructive" />
                   <span className="text-sm font-medium">Hypertension</span>
                 </div>
-                <p className="text-2xl font-bold">{patientCohorts.hypertension.length}</p>
-                <p className="text-xs text-muted-foreground">
-                  {kpis.bpControlled} controlled
+                <p className="text-3xl font-bold">{patientCohorts.hypertension.length}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  <span className="text-success">{kpis.bpControlled}</span> BP controlled
                 </p>
               </div>
-              <div className="p-3 border rounded-lg">
-                <div className="flex items-center gap-2 mb-1">
-                  <Activity className="h-4 w-4 text-blue-500" />
+              
+              <div className="p-4 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 hover:shadow-md transition-all">
+                <div className="flex items-center gap-2 mb-2">
+                  <Activity className="h-4 w-4 text-primary" />
                   <span className="text-sm font-medium">Diabetes</span>
                 </div>
-                <p className="text-2xl font-bold">{patientCohorts.diabetes.length}</p>
-                <p className="text-xs text-muted-foreground">
-                  {kpis.diabeticControlled} HbA1c ≤58
+                <p className="text-3xl font-bold">{patientCohorts.diabetes.length}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  <span className="text-success">{kpis.diabeticControlled}</span> HbA1c ≤58
                 </p>
               </div>
-              <div className="p-3 border rounded-lg">
-                <div className="flex items-center gap-2 mb-1">
-                  <HeartPulse className="h-4 w-4 text-pink-500" />
+              
+              <div className="p-4 rounded-xl bg-gradient-to-br from-accent/10 to-accent/5 border border-accent/20 hover:shadow-md transition-all">
+                <div className="flex items-center gap-2 mb-2">
+                  <HeartPulse className="h-4 w-4 text-accent" />
                   <span className="text-sm font-medium">CHD</span>
                 </div>
-                <p className="text-2xl font-bold">{patientCohorts.chd.length}</p>
-                <p className="text-xs text-muted-foreground">coronary heart disease</p>
+                <p className="text-3xl font-bold">{patientCohorts.chd.length}</p>
+                <p className="text-xs text-muted-foreground mt-1">Coronary heart disease</p>
               </div>
-              <div className="p-3 border rounded-lg">
-                <div className="flex items-center gap-2 mb-1">
-                  <Wind className="h-4 w-4 text-cyan-500" />
-                  <span className="text-sm font-medium">Asthma/COPD</span>
+              
+              <div className="p-4 rounded-xl bg-gradient-to-br from-warning/10 to-warning/5 border border-warning/20 hover:shadow-md transition-all">
+                <div className="flex items-center gap-2 mb-2">
+                  <Wind className="h-4 w-4 text-warning" />
+                  <span className="text-sm font-medium">Respiratory</span>
                 </div>
-                <p className="text-2xl font-bold">{patientCohorts.asthma.length + patientCohorts.copd.length}</p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-3xl font-bold">{patientCohorts.asthma.length + patientCohorts.copd.length}</p>
+                <p className="text-xs text-muted-foreground mt-1">
                   {patientCohorts.asthma.length} asthma, {patientCohorts.copd.length} COPD
                 </p>
               </div>
-              <div className="p-3 border rounded-lg">
-                <div className="flex items-center gap-2 mb-1">
-                  <Brain className="h-4 w-4 text-purple-500" />
+              
+              <div className="p-4 rounded-xl bg-gradient-to-br from-secondary to-secondary/50 border border-border hover:shadow-md transition-all">
+                <div className="flex items-center gap-2 mb-2">
+                  <Brain className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm font-medium">Mental Health</span>
                 </div>
-                <p className="text-2xl font-bold">{patientCohorts.mentalHealth.length}</p>
-                <p className="text-xs text-muted-foreground">
-                  {patientCohorts.frail.length} frail
+                <p className="text-3xl font-bold">{patientCohorts.mentalHealth.length}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {patientCohorts.frail.length} frail patients
                 </p>
               </div>
             </div>
+
             {aiSummaries.length > 0 && (
-              <div className="mt-4 pt-4 border-t">
-                <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
-                  <Brain className="h-4 w-4" />
-                  Recent AI Summaries ({aiSummaries.length} total)
+              <div className="mt-6 pt-6 border-t">
+                <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  Recent AI Summaries
+                  <Badge variant="secondary">{aiSummaries.length} total</Badge>
                 </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {aiSummaries.slice(0, 3).map((summary: any) => (
-                    <div key={summary.id} className="p-3 bg-muted/50 rounded-lg text-sm">
-                      <div className="flex items-center justify-between mb-1">
+                    <div key={summary.id} className="p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                      <div className="flex items-center justify-between mb-2">
                         <Link 
                           to={`/patients?search=${encodeURIComponent(summary.patients?.name || '')}`}
-                          className="font-medium text-primary hover:underline"
+                          className="font-medium text-sm text-primary hover:underline"
                         >
                           {summary.patients?.name}
                         </Link>
@@ -735,7 +776,7 @@ export default function AIAnalytics() {
                           {new Date(summary.created_at).toLocaleDateString('en-GB')}
                         </span>
                       </div>
-                      <p className="text-muted-foreground line-clamp-2">
+                      <p className="text-xs text-muted-foreground line-clamp-2">
                         {summary.clinical_summary}
                       </p>
                     </div>
@@ -746,33 +787,35 @@ export default function AIAnalytics() {
           </CardContent>
         </Card>
 
-        <Tabs value={viewTab} onValueChange={(v) => setViewTab(v as ViewTab)} className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="indicators" className="flex items-center gap-2">
+        {/* Main Tabs */}
+        <Tabs value={viewTab} onValueChange={(v) => setViewTab(v as ViewTab)} className="w-full animate-fade-in" style={{ animationDelay: '450ms' }}>
+          <TabsList className="grid w-full max-w-md grid-cols-2 p-1 h-12">
+            <TabsTrigger value="indicators" className="flex items-center gap-2 text-sm">
               <TrendingUp className="h-4 w-4" />
               QOF Indicators
             </TabsTrigger>
-            <TabsTrigger value="actions" className="flex items-center gap-2">
+            <TabsTrigger value="actions" className="flex items-center gap-2 text-sm">
               <ListChecks className="h-4 w-4" />
               Action List
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="indicators" className="mt-4">
-            {/* QOF Indicators by Category */}
-            <Card>
+          <TabsContent value="indicators" className="mt-6">
+            <Card className="shadow-sm">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-primary" />
-                  NHS QOF Indicators 2024/25
-                </CardTitle>
-                <CardDescription>
-                  Track achievement against Quality and Outcomes Framework targets across all clinical domains
-                </CardDescription>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <TrendingUp className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle>NHS QOF Indicators 2024/25</CardTitle>
+                    <CardDescription>Track achievement against Quality and Outcomes Framework targets</CardDescription>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 <ScrollArea className="h-[500px] pr-4">
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {groupedIndicators.map((category) => {
                       const Icon = getCategoryIcon(category.icon);
                       const categoryScore = getCategoryScore(category.indicators);
@@ -785,9 +828,9 @@ export default function AIAnalytics() {
                           onOpenChange={() => toggleCategory(category.name)}
                         >
                           <CollapsibleTrigger asChild>
-                            <div className="flex items-center justify-between p-4 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                            <div className="flex items-center justify-between p-4 rounded-xl border bg-card cursor-pointer hover:bg-muted/50 hover:shadow-sm transition-all">
                               <div className="flex items-center gap-3">
-                                <div className="p-2 bg-primary/10 rounded-lg">
+                                <div className="p-2.5 bg-primary/10 rounded-lg">
                                   <Icon className="h-5 w-5 text-primary" />
                                 </div>
                                 <div>
@@ -799,25 +842,27 @@ export default function AIAnalytics() {
                               </div>
                               <div className="flex items-center gap-4">
                                 <div className="text-right">
-                                  <div className={`text-lg font-bold ${categoryScore >= 70 ? 'text-green-600' : categoryScore >= 50 ? 'text-amber-500' : 'text-red-500'}`}>
+                                  <div className={`text-xl font-bold ${categoryScore >= 70 ? 'text-success' : categoryScore >= 50 ? 'text-warning' : 'text-destructive'}`}>
                                     {categoryScore}%
                                   </div>
-                                  <div className="text-xs text-muted-foreground">avg. achievement</div>
+                                  <div className="text-xs text-muted-foreground">avg. score</div>
                                 </div>
-                                {isExpanded ? (
-                                  <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                                ) : (
-                                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                                )}
+                                <div className="p-1 rounded-md bg-muted">
+                                  {isExpanded ? (
+                                    <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                                  ) : (
+                                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </CollapsibleTrigger>
                           <CollapsibleContent>
-                            <div className="mt-2 ml-4 space-y-3 border-l-2 border-muted pl-4">
+                            <div className="mt-2 ml-6 space-y-2 border-l-2 border-primary/20 pl-4">
                               {category.indicators.map((indicator) => {
                                 const progress = getIndicatorProgress(indicator);
                                 return (
-                                  <div key={indicator.id} className="p-3 bg-muted/30 rounded-lg space-y-2">
+                                  <div key={indicator.id} className="p-4 bg-muted/30 rounded-lg space-y-3 hover:bg-muted/50 transition-colors">
                                     <div className="flex items-start justify-between gap-2">
                                       <div className="flex-1">
                                         <div className="flex items-center gap-2 flex-wrap">
@@ -832,7 +877,7 @@ export default function AIAnalytics() {
                                           )}
                                           <Tooltip>
                                             <TooltipTrigger>
-                                              <Info className="h-3 w-3 text-muted-foreground" />
+                                              <Info className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground transition-colors" />
                                             </TooltipTrigger>
                                             <TooltipContent side="top" className="max-w-xs">
                                               <p className="text-sm">{indicator.description}</p>
@@ -848,22 +893,29 @@ export default function AIAnalytics() {
                                         )}
                                       </div>
                                       <div className="text-right shrink-0">
-                                        <span className={`font-bold ${getStatusColor(progress.status)}`}>
+                                        <span className={`text-lg font-bold ${getStatusColor(progress.status)}`}>
                                           {progress.percent}%
                                         </span>
                                         <span className="text-muted-foreground text-sm"> / {indicator.targetPercent}%</span>
                                       </div>
                                     </div>
                                     <div className="relative">
-                                      <Progress value={progress.percent} className="h-2" />
+                                      <Progress 
+                                        value={progress.percent} 
+                                        className={`h-2 ${
+                                          progress.status === 'good' ? '[&>div]:bg-success' :
+                                          progress.status === 'warning' ? '[&>div]:bg-warning' : '[&>div]:bg-destructive'
+                                        }`}
+                                      />
                                       <div 
-                                        className="absolute top-0 h-2 w-0.5 bg-foreground/70" 
+                                        className="absolute top-0 h-2 w-0.5 bg-foreground/50" 
                                         style={{ left: `${Math.min(indicator.targetPercent, 100)}%` }}
                                       />
                                     </div>
                                     {progress.gap > 0 && (
-                                      <p className="text-xs text-muted-foreground">
-                                        Gap: {progress.gap}% • ~{Math.ceil((progress.gap / 100) * patients.length)} patients needed to meet target
+                                      <p className="text-xs text-muted-foreground flex items-center gap-2">
+                                        <AlertTriangle className="h-3 w-3" />
+                                        Gap: {progress.gap}% • ~{Math.ceil((progress.gap / 100) * patients.length)} patients needed
                                       </p>
                                     )}
                                   </div>
@@ -880,28 +932,31 @@ export default function AIAnalytics() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="actions" className="mt-4">
+          <TabsContent value="actions" className="mt-6">
             <QOFActionList />
           </TabsContent>
         </Tabs>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Bottom Grid: Tasks + Gaps */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in" style={{ animationDelay: '500ms' }}>
           {/* Pending Tasks */}
-          <Card>
-            <CardHeader>
+          <Card className="shadow-sm">
+            <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <ClipboardList className="h-5 w-5 text-primary" />
-                    Pending Tasks
-                  </CardTitle>
-                  <CardDescription>{filteredTasks.length} tasks awaiting action</CardDescription>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-warning/10 rounded-lg">
+                    <ClipboardList className="h-5 w-5 text-warning" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">Pending Tasks</CardTitle>
+                    <CardDescription>{filteredTasks.length} awaiting action</CardDescription>
+                  </div>
                 </div>
-                <Button variant="ghost" size="sm" onClick={exportTasks}>
+                <Button variant="ghost" size="icon" onClick={exportTasks}>
                   <Download className="h-4 w-4" />
                 </Button>
               </div>
-              <div className="flex items-center gap-2 mt-2">
+              <div className="flex items-center gap-2 mt-3">
                 <Filter className="h-4 w-4 text-muted-foreground" />
                 <Select value={priorityFilter} onValueChange={(v) => setPriorityFilter(v as PriorityFilter)}>
                   <SelectTrigger className="h-8 w-[130px]">
@@ -919,37 +974,39 @@ export default function AIAnalytics() {
             <CardContent>
               <ScrollArea className="h-[280px]">
                 {filteredTasks.length > 0 ? (
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {filteredTasks.slice(0, 10).map((task: any) => (
-                      <div key={task.id} className="p-3 border rounded-lg space-y-2">
+                      <div key={task.id} className="p-3 rounded-lg border hover:bg-muted/50 transition-colors">
                         <div className="flex items-start justify-between gap-2">
                           <span className="font-medium text-sm line-clamp-1">{task.title}</span>
-                          <Badge variant={getPriorityColor(task.priority)} className="shrink-0">
+                          <Badge variant={getPriorityColor(task.priority)} className="shrink-0 text-xs">
                             {task.priority}
                           </Badge>
                         </div>
-                        {task.patients && (
-                          <Link 
-                            to={`/patients?search=${encodeURIComponent(task.patients.name)}`}
-                            className="flex items-center gap-1 text-xs text-primary hover:underline"
-                          >
-                            <User className="h-3 w-3" />
-                            {task.patients.name}
-                          </Link>
-                        )}
-                        {task.due_date && (
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Clock className="h-3 w-3" />
-                            Due: {new Date(task.due_date).toLocaleDateString()}
-                          </div>
-                        )}
+                        <div className="flex items-center gap-3 mt-2">
+                          {task.patients && (
+                            <Link 
+                              to={`/patients?search=${encodeURIComponent(task.patients.name)}`}
+                              className="flex items-center gap-1 text-xs text-primary hover:underline"
+                            >
+                              <User className="h-3 w-3" />
+                              {task.patients.name}
+                            </Link>
+                          )}
+                          {task.due_date && (
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Clock className="h-3 w-3" />
+                              {new Date(task.due_date).toLocaleDateString('en-GB')}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                    <CheckCircle2 className="h-8 w-8 mb-2" />
-                    <p>No pending tasks</p>
+                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-8">
+                    <CheckCircle2 className="h-10 w-10 mb-2 opacity-50" />
+                    <p className="text-sm">No pending tasks</p>
                   </div>
                 )}
               </ScrollArea>
@@ -961,23 +1018,25 @@ export default function AIAnalytics() {
             </CardContent>
           </Card>
 
-          {/* QOF Gaps - Patients needing attention */}
-          <Card>
-            <CardHeader>
+          {/* QOF Gaps */}
+          <Card className="shadow-sm">
+            <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5 text-warning" />
-                    QOF Gaps
-                  </CardTitle>
-                  <CardDescription>Patients missing key health data</CardDescription>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-destructive/10 rounded-lg">
+                    <AlertTriangle className="h-5 w-5 text-destructive" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">QOF Gaps</CardTitle>
+                    <CardDescription>Patients missing key health data</CardDescription>
+                  </div>
                 </div>
-                <Button variant="ghost" size="sm" onClick={exportQOFGaps}>
+                <Button variant="ghost" size="icon" onClick={exportQOFGaps}>
                   <Download className="h-4 w-4" />
                 </Button>
               </div>
-              <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <Filter className="h-4 w-4 text-muted-foreground" />
+              <div className="flex items-center gap-2 mt-3 flex-wrap">
+                <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
                 <Select value={gapFilter} onValueChange={(v) => setGapFilter(v as GapFilter)}>
                   <SelectTrigger className="h-8 w-[160px]">
                     <SelectValue placeholder="Filter by gap" />
@@ -989,8 +1048,8 @@ export default function AIAnalytics() {
                     <SelectItem value="no-data">No Data ({qofGaps.missingResponses.length})</SelectItem>
                   </SelectContent>
                 </Select>
-                <div className="relative flex-1 min-w-[150px]">
-                  <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <div className="relative flex-1 min-w-[120px]">
+                  <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Search..."
                     value={searchQuery}
@@ -1014,16 +1073,18 @@ export default function AIAnalytics() {
                         <Link
                           key={patient.id}
                           to={`/patients?search=${encodeURIComponent(patient.name)}`}
-                          className="flex items-center gap-3 p-2 border rounded-lg hover:bg-muted transition-colors"
+                          className="flex items-center gap-3 p-2.5 rounded-lg border hover:bg-muted/50 hover:shadow-sm transition-all"
                         >
-                          <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <div className="p-1.5 bg-muted rounded-full">
+                            <User className="h-3.5 w-3.5 text-muted-foreground" />
+                          </div>
                           <div className="min-w-0 flex-1">
                             <p className="text-sm font-medium truncate">{patient.name}</p>
                             <p className="text-xs text-muted-foreground">{patient.nhs_number}</p>
                           </div>
                           <div className="flex gap-1 flex-wrap justify-end">
                             {missingItems.map(item => (
-                              <Badge key={item} variant="outline" className="text-xs px-1 py-0">
+                              <Badge key={item} variant="outline" className="text-xs px-1.5 py-0">
                                 {item}
                               </Badge>
                             ))}
@@ -1034,13 +1095,13 @@ export default function AIAnalytics() {
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-8">
-                    <CheckCircle2 className="h-8 w-8 mb-2" />
-                    <p>No patients match filters</p>
+                    <CheckCircle2 className="h-10 w-10 mb-2 opacity-50" />
+                    <p className="text-sm">No patients match filters</p>
                   </div>
                 )}
               </ScrollArea>
               {filteredGapPatients.length > 15 && (
-                <p className="text-xs text-muted-foreground text-center mt-2">
+                <p className="text-xs text-muted-foreground text-center mt-3">
                   Showing 15 of {filteredGapPatients.length} patients
                 </p>
               )}
@@ -1050,25 +1111,29 @@ export default function AIAnalytics() {
 
         {/* Health Alerts */}
         {healthAlerts.length > 0 && (
-          <Card>
+          <Card className="shadow-sm animate-fade-in" style={{ animationDelay: '550ms' }}>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-destructive" />
-                Unresolved Health Alerts
-              </CardTitle>
-              <CardDescription>{healthAlerts.length} alerts requiring attention</CardDescription>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-destructive/10 rounded-lg">
+                  <AlertTriangle className="h-5 w-5 text-destructive" />
+                </div>
+                <div>
+                  <CardTitle>Unresolved Health Alerts</CardTitle>
+                  <CardDescription>{healthAlerts.length} alerts requiring attention</CardDescription>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {healthAlerts.slice(0, 6).map((alert: any) => (
-                  <div key={alert.id} className={`p-4 rounded-lg border ${getSeverityColor(alert.severity)}`}>
+                  <div key={alert.id} className={`p-4 rounded-xl border ${getSeverityColor(alert.severity)} hover:shadow-md transition-all`}>
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <span className="font-medium text-sm">{alert.title}</span>
-                      <Badge variant={alert.severity === 'critical' ? 'destructive' : 'secondary'}>
+                      <Badge variant={alert.severity === 'critical' ? 'destructive' : 'secondary'} className="text-xs">
                         {alert.severity}
                       </Badge>
                     </div>
-                    <p className="text-xs mb-2 line-clamp-2">{alert.description}</p>
+                    <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{alert.description}</p>
                     {alert.patients && (
                       <Link 
                         to={`/patients?search=${encodeURIComponent(alert.patients.name)}`}
