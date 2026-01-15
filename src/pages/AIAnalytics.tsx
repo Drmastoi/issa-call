@@ -70,7 +70,7 @@ export default function AIAnalytics() {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryTab, setCategoryTab] = useState<CategoryTab>('all');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['Cardiovascular']));
-  const [viewTab, setViewTab] = useState<ViewTab>('indicators');
+  const [viewTab, setViewTab] = useState<ViewTab>('actions');
 
   // Fetch patients with clinical data
   const { data: patients = [] } = useQuery({
