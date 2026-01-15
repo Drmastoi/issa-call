@@ -134,6 +134,44 @@ export type Database = {
           },
         ]
       }
+      call_audit_log: {
+        Row: {
+          action: string
+          actor: string
+          call_id: string | null
+          created_at: string | null
+          details: Json | null
+          id: string
+          ip_address: string | null
+        }
+        Insert: {
+          action: string
+          actor: string
+          call_id?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          ip_address?: string | null
+        }
+        Update: {
+          action?: string
+          actor?: string
+          call_id?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          ip_address?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_audit_log_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: false
+            referencedRelation: "calls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       call_batches: {
         Row: {
           created_at: string
@@ -181,6 +219,35 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      call_references: {
+        Row: {
+          call_id: string | null
+          created_at: string | null
+          id: string
+          reference_code: string
+        }
+        Insert: {
+          call_id?: string | null
+          created_at?: string | null
+          id?: string
+          reference_code: string
+        }
+        Update: {
+          call_id?: string | null
+          created_at?: string | null
+          id?: string
+          reference_code?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_references_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: false
+            referencedRelation: "calls"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       call_responses: {
         Row: {
@@ -249,40 +316,52 @@ export type Database = {
         Row: {
           attempt_number: number
           batch_id: string | null
+          consent_given_at: string | null
           created_at: string
           duration_seconds: number | null
           ended_at: string | null
           id: string
           patient_id: string
+          recording_disclosure_played: boolean | null
+          retention_days: number | null
           started_at: string | null
           status: string
           transcript: string | null
+          transcript_deleted_at: string | null
           twilio_call_sid: string | null
         }
         Insert: {
           attempt_number?: number
           batch_id?: string | null
+          consent_given_at?: string | null
           created_at?: string
           duration_seconds?: number | null
           ended_at?: string | null
           id?: string
           patient_id: string
+          recording_disclosure_played?: boolean | null
+          retention_days?: number | null
           started_at?: string | null
           status?: string
           transcript?: string | null
+          transcript_deleted_at?: string | null
           twilio_call_sid?: string | null
         }
         Update: {
           attempt_number?: number
           batch_id?: string | null
+          consent_given_at?: string | null
           created_at?: string
           duration_seconds?: number | null
           ended_at?: string | null
           id?: string
           patient_id?: string
+          recording_disclosure_played?: boolean | null
+          retention_days?: number | null
           started_at?: string | null
           status?: string
           transcript?: string | null
+          transcript_deleted_at?: string | null
           twilio_call_sid?: string | null
         }
         Relationships: [
@@ -639,7 +718,18 @@ export type Database = {
       }
     }
     Functions: {
+      generate_call_reference: { Args: { p_call_id: string }; Returns: string }
       get_anonymous_id: { Args: { p_patient_id: string }; Returns: string }
+      log_call_audit: {
+        Args: {
+          p_action: string
+          p_actor: string
+          p_call_id: string
+          p_details?: Json
+          p_ip_address?: string
+        }
+        Returns: string
+      }
       resolve_anonymous_id: {
         Args: { p_anonymous_id: string }
         Returns: string
