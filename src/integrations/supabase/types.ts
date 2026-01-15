@@ -426,6 +426,38 @@ export type Database = {
           },
         ]
       }
+      patient_pseudonyms: {
+        Row: {
+          anonymous_id: string
+          created_at: string
+          id: string
+          patient_id: string
+          rotated_at: string | null
+        }
+        Insert: {
+          anonymous_id?: string
+          created_at?: string
+          id?: string
+          patient_id: string
+          rotated_at?: string | null
+        }
+        Update: {
+          anonymous_id?: string
+          created_at?: string
+          id?: string
+          patient_id?: string
+          rotated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patient_pseudonyms_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: true
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       patients: {
         Row: {
           ai_extracted_at: string | null
@@ -566,10 +598,52 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      alerts_analytics_aggregate: {
+        Row: {
+          acknowledged_count: number | null
+          alert_count: number | null
+          alert_date: string | null
+          alert_type: string | null
+          severity: string | null
+        }
+        Relationships: []
+      }
+      analytics_aggregate: {
+        Row: {
+          af_count: number | null
+          asthma_count: number | null
+          avg_hba1c: number | null
+          chd_count: number | null
+          copd_count: number | null
+          diabetes_count: number | null
+          frailty_mild_count: number | null
+          frailty_moderate_count: number | null
+          frailty_severe_count: number | null
+          hba1c_above_target_count: number | null
+          hypertension_count: number | null
+          reviewed_last_year: number | null
+          total_patients: number | null
+        }
+        Relationships: []
+      }
+      call_analytics_aggregate: {
+        Row: {
+          avg_duration_seconds: number | null
+          call_date: string | null
+          completed_calls: number | null
+          failed_calls: number | null
+          pending_calls: number | null
+          total_calls: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
-      [_ in never]: never
+      get_anonymous_id: { Args: { p_patient_id: string }; Returns: string }
+      resolve_anonymous_id: {
+        Args: { p_anonymous_id: string }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never

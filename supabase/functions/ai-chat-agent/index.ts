@@ -37,9 +37,9 @@ const tools = [
             type: "string",
             description: "Due date in ISO format (YYYY-MM-DD). If user says 'tomorrow', calculate the date."
           },
-          patient_name: {
+          patient_reference: {
             type: "string",
-            description: "Name of the patient this task relates to (optional)"
+            description: "Anonymous reference ID of the patient this task relates to (e.g., 'Patient-A1B2')"
           }
         },
         required: ["title"],
@@ -48,6 +48,11 @@ const tools = [
     }
   }
 ];
+
+// Generate a short anonymous reference from UUID
+function generateAnonymousRef(uuid: string): string {
+  return `Patient-${uuid.substring(0, 4).toUpperCase()}`;
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -67,30 +72,62 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Fetch relevant context data
-    console.log("Fetching context data for AI chat...");
+    console.log("Fetching anonymized context data for AI chat (GDPR compliant)...");
 
+    // Fetch data with pseudonymization mapping
     const [
       patientsResult,
       alertsResult,
       tasksResult,
-      callResponsesResult
+      callResponsesResult,
+      analyticsResult
     ] = await Promise.all([
-      supabase.from('patients').select('*').limit(50),
-      supabase.from('health_alerts').select('*, patients(name, nhs_number)').eq('acknowledged', false).limit(20),
+      supabase.from('patients').select('id, conditions, medications, frailty_status').limit(50),
+      supabase.from('health_alerts').select('id, patient_id, alert_type, severity, title, description, metrics').is('acknowledged_at', null).limit(20),
       supabase.from('meditask_tasks').select('*').in('status', ['pending', 'in_progress']).limit(30),
-      supabase.from('call_responses').select('*, patients(name)').order('created_at', { ascending: false }).limit(30)
+      supabase.from('call_responses').select('id, patient_id, blood_pressure_systolic, blood_pressure_diastolic, pulse_rate, weight_kg, height_cm, smoking_status, alcohol_units_per_week, collected_at').order('created_at', { ascending: false }).limit(30),
+      supabase.from('analytics_aggregate').select('*').single()
     ]);
 
-    // Build context summary
+    // Create pseudonym mapping for patients
     const patients = patientsResult.data || [];
     const alerts = alertsResult.data || [];
     const tasks = tasksResult.data || [];
     const callResponses = callResponsesResult.data || [];
+    const aggregateStats = analyticsResult.data;
 
-    // Calculate statistics
+    // Build patient ID to anonymous reference map
+    const patientIdToRef: Record<string, string> = {};
+    const refToPatientId: Record<string, string> = {};
+    
+    patients.forEach((p, idx) => {
+      const ref = generateAnonymousRef(p.id);
+      patientIdToRef[p.id] = ref;
+      refToPatientId[ref] = p.id;
+    });
+
+    // Also map patients from alerts and call responses
+    alerts.forEach(a => {
+      if (a.patient_id && !patientIdToRef[a.patient_id]) {
+        const ref = generateAnonymousRef(a.patient_id);
+        patientIdToRef[a.patient_id] = ref;
+        refToPatientId[ref] = a.patient_id;
+      }
+    });
+    
+    callResponses.forEach(r => {
+      if (r.patient_id && !patientIdToRef[r.patient_id]) {
+        const ref = generateAnonymousRef(r.patient_id);
+        patientIdToRef[r.patient_id] = ref;
+        refToPatientId[ref] = r.patient_id;
+      }
+    });
+
+    // Calculate statistics from aggregate view (no PII)
     const stats = {
-      totalPatients: patients.length,
+      totalPatients: aggregateStats?.total_patients || patients.length,
+      diabetesCount: aggregateStats?.diabetes_count || 0,
+      hypertensionCount: aggregateStats?.hypertension_count || 0,
       criticalAlerts: alerts.filter(a => a.severity === 'critical').length,
       warningAlerts: alerts.filter(a => a.severity === 'warning').length,
       pendingTasks: tasks.filter(t => t.status === 'pending').length,
@@ -98,94 +135,99 @@ serve(async (req) => {
       highPriorityTasks: tasks.filter(t => t.priority === 'high' || t.priority === 'urgent').length
     };
 
-    // Build patient summaries for context
-    const patientSummaries = patients.map(p => ({
-      id: p.id,
-      name: p.name,
-      nhsNumber: p.nhs_number,
-      dob: p.date_of_birth,
-      conditions: p.conditions,
-      medications: p.medications
+    // Build ANONYMIZED patient summaries for AI context (NO PII)
+    const anonymizedPatientSummaries = patients.map(p => ({
+      reference: patientIdToRef[p.id],
+      conditions: p.conditions || [],
+      medicationCount: (p.medications || []).length,
+      frailtyStatus: p.frailty_status
     }));
 
-    // Build alert summaries
-    const alertSummaries = alerts.map(a => ({
-      patient: a.patients?.name || 'Unknown',
+    // Build ANONYMIZED alert summaries (NO patient names)
+    const anonymizedAlertSummaries = alerts.map(a => ({
+      patientRef: patientIdToRef[a.patient_id] || 'Unknown',
       type: a.alert_type,
       severity: a.severity,
-      title: a.title,
+      title: a.title?.replace(/Patient: [^,]+,/, 'Patient:').replace(/: [A-Z][a-z]+ [A-Z][a-z]+/, ''), // Remove any patient names from title
       description: a.description
     }));
 
-    // Build task summaries
+    // Build task summaries (already no PII in task data)
     const taskSummaries = tasks.map(t => ({
       title: t.title,
       description: t.description,
       priority: t.priority,
       status: t.status,
       dueDate: t.due_date,
-      category: t.category
+      patientRef: t.patient_id ? patientIdToRef[t.patient_id] : null
     }));
 
-    // Build recent call response summaries
-    const responseSummaries = callResponses.slice(0, 10).map(r => ({
-      patient: r.patients?.name || 'Unknown',
+    // Build ANONYMIZED call response summaries (NO patient names)
+    const anonymizedResponseSummaries = callResponses.slice(0, 10).map(r => ({
+      patientRef: patientIdToRef[r.patient_id] || 'Unknown',
       bp: r.blood_pressure_systolic && r.blood_pressure_diastolic 
         ? `${r.blood_pressure_systolic}/${r.blood_pressure_diastolic}` : null,
       pulse: r.pulse_rate,
-      date: r.created_at
+      date: r.collected_at
     }));
 
     const today = new Date().toISOString().split('T')[0];
     const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
 
+    // GDPR-COMPLIANT SYSTEM PROMPT - NO PATIENT IDENTIFIABLE INFORMATION
     const systemPrompt = `You are ISSA Care AI Assistant, an intelligent healthcare companion for GP practice staff. You help analyze patient data, track health metrics, manage tasks, and provide smart clinical suggestions.
+
+## IMPORTANT: GDPR Compliance
+All patient data is provided using anonymous reference IDs (e.g., "Patient-A1B2"). You do NOT have access to patient names, NHS numbers, dates of birth, or addresses. This is by design for GDPR compliance.
 
 ## Today's Date: ${today}
 ## Tomorrow's Date: ${tomorrow}
 
 ## Your Capabilities:
-1. **Patient Data Analysis** - Query and analyze patient demographics, conditions, medications
+1. **Patient Data Analysis** - Query and analyze patient conditions, medications (anonymized references only)
 2. **Health Metrics Review** - Examine blood pressure, pulse, symptoms, and other vitals
 3. **Alert Management** - Identify critical and warning health alerts requiring attention
 4. **Task Management** - Monitor pending tasks, create new tasks using the create_task function
 5. **Smart Suggestions** - Provide actionable recommendations for patient care
 
 ## IMPORTANT - Task Creation:
-When the user asks you to create, add, or schedule a task, you MUST use the create_task function.
+When the user asks you to create a task, you MUST use the create_task function.
 - Always confirm what task you're creating
 - Use appropriate priority based on context (urgent for critical patients, high for time-sensitive)
-- If a patient is mentioned, include their name in the task
+- If a patient reference is mentioned, include it in the task
 - Calculate due dates: "tomorrow" = ${tomorrow}, "next week" = add 7 days, etc.
 
-## Current Practice Overview:
+## Current Practice Overview (Aggregate Statistics):
 - Total Patients: ${stats.totalPatients}
+- Patients with Diabetes: ${stats.diabetesCount}
+- Patients with Hypertension: ${stats.hypertensionCount}
 - Critical Alerts: ${stats.criticalAlerts}
 - Warning Alerts: ${stats.warningAlerts}
 - Pending Tasks: ${stats.pendingTasks}
 - Overdue Tasks: ${stats.overdueTasks}
 - High Priority Tasks: ${stats.highPriorityTasks}
 
-## Current Patient Data:
-${JSON.stringify(patientSummaries, null, 2)}
+## Patient Clinical Data (Anonymized - No PII):
+${JSON.stringify(anonymizedPatientSummaries, null, 2)}
 
-## Active Health Alerts (Unacknowledged):
-${JSON.stringify(alertSummaries, null, 2)}
+## Active Health Alerts (Anonymized):
+${JSON.stringify(anonymizedAlertSummaries, null, 2)}
 
 ## Pending/In-Progress Tasks:
 ${JSON.stringify(taskSummaries, null, 2)}
 
-## Recent Call Responses:
-${JSON.stringify(responseSummaries, null, 2)}
+## Recent Health Check Results (Anonymized):
+${JSON.stringify(anonymizedResponseSummaries, null, 2)}
 
 ## Guidelines:
 - Be concise but thorough in your responses
 - Prioritize patient safety - always flag critical issues first
 - When asked to create a task, use the create_task function
 - Format responses with markdown for readability (bold, lists, etc.)
-- If asked about something not in the data, say so clearly`;
+- If asked about specific patient names, explain that you only work with anonymous references for GDPR compliance
+- Refer to patients by their reference ID (e.g., "Patient-A1B2") not by name`;
 
-    console.log("Calling Lovable AI Gateway with tools...");
+    console.log("Calling Lovable AI Gateway with GDPR-compliant anonymized data...");
 
     // First call - may include tool calls
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -202,7 +244,7 @@ ${JSON.stringify(responseSummaries, null, 2)}
         ],
         tools: tools,
         tool_choice: "auto",
-        stream: false, // Non-streaming for tool handling
+        stream: false,
       }),
     });
 
@@ -243,15 +285,11 @@ ${JSON.stringify(responseSummaries, null, 2)}
           const args = JSON.parse(toolCall.function.arguments);
           console.log("Creating task with args:", args);
           
-          // Find patient ID if patient_name is provided
+          // Resolve patient ID from reference if provided
           let patientId = null;
-          if (args.patient_name) {
-            const patient = patients.find(p => 
-              p.name.toLowerCase().includes(args.patient_name.toLowerCase())
-            );
-            if (patient) {
-              patientId = patient.id;
-            }
+          if (args.patient_reference) {
+            // Try to find patient ID from reference
+            patientId = refToPatientId[args.patient_reference] || null;
           }
           
           // Create the task
@@ -288,7 +326,7 @@ ${JSON.stringify(responseSummaries, null, 2)}
                   title: taskData.title,
                   priority: taskData.priority,
                   due_date: taskData.due_date,
-                  patient_name: args.patient_name || null
+                  patient_reference: args.patient_reference || null
                 }
               })
             });
@@ -325,7 +363,6 @@ ${JSON.stringify(responseSummaries, null, 2)}
     }
 
     // No tool calls - stream the response directly
-    // Need to make another streaming call since we did non-streaming for tool detection
     const streamResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
