@@ -405,6 +405,45 @@ export type Database = {
           },
         ]
       }
+      consent_settings: {
+        Row: {
+          id: string
+          message_text: string
+          message_type: string
+          similarity_boost: number
+          stability: number
+          style: number
+          updated_at: string
+          updated_by: string | null
+          use_speaker_boost: boolean
+          voice_id: string
+        }
+        Insert: {
+          id?: string
+          message_text: string
+          message_type: string
+          similarity_boost?: number
+          stability?: number
+          style?: number
+          updated_at?: string
+          updated_by?: string | null
+          use_speaker_boost?: boolean
+          voice_id?: string
+        }
+        Update: {
+          id?: string
+          message_text?: string
+          message_type?: string
+          similarity_boost?: number
+          stability?: number
+          style?: number
+          updated_at?: string
+          updated_by?: string | null
+          use_speaker_boost?: boolean
+          voice_id?: string
+        }
+        Relationships: []
+      }
       data_sharing_requests: {
         Row: {
           created_at: string | null

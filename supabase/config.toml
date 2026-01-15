@@ -9,6 +9,9 @@ verify_jwt = false
 [functions.consent-audio]
 verify_jwt = false
 
+[functions.consent-speech]
+verify_jwt = false
+
 [functions.save-call-response]
 verify_jwt = false
 
