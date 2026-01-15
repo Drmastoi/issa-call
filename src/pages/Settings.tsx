@@ -8,8 +8,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { User, Shield, Phone, History } from 'lucide-react';
+import { User, Shield, Phone, History, Volume2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ConsentVoiceSettings } from '@/components/settings/ConsentVoiceSettings';
 
 interface Profile {
   id: string;
@@ -110,6 +111,10 @@ export default function Settings() {
           <TabsTrigger value="calling" className="gap-2">
             <Phone className="h-4 w-4" />
             Calling
+          </TabsTrigger>
+          <TabsTrigger value="voice" className="gap-2">
+            <Volume2 className="h-4 w-4" />
+            Voice Settings
           </TabsTrigger>
           <TabsTrigger value="audit" className="gap-2">
             <History className="h-4 w-4" />
@@ -237,6 +242,10 @@ export default function Settings() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="voice">
+          <ConsentVoiceSettings />
         </TabsContent>
 
         <TabsContent value="audit">
