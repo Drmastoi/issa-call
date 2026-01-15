@@ -243,7 +243,7 @@ export type Database = {
           {
             foreignKeyName: "call_references_call_id_fkey"
             columns: ["call_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "calls"
             referencedColumns: ["id"]
           },
