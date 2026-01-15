@@ -6,6 +6,9 @@ verify_jwt = false
 [functions.twilio-webhook]
 verify_jwt = false
 
+[functions.consent-audio]
+verify_jwt = false
+
 [functions.save-call-response]
 verify_jwt = false
 
