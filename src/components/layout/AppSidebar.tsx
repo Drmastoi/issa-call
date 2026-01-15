@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Calendar, Phone, FileDown, Settings, LogOut, ChevronLeft, ChevronRight, ClipboardList, Brain, User, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Phone, FileDown, Settings, LogOut, ChevronLeft, ChevronRight, ClipboardList, Brain, User, ShieldCheck, Shield } from 'lucide-react';
+import { useUserRole } from '@/hooks/useUserRole';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -49,14 +50,26 @@ export function AppSidebar() {
     signOut,
     user
   } = useAuth();
+  const { isCaldicottGuardian } = useUserRole();
   const [collapsed, setCollapsed] = useState(false);
+  
+  // Build nav items dynamically based on role
+  const visibleNavItems = [
+    ...navItems,
+    // Only show Caldicott Dashboard to Caldicott Guardians
+    ...(isCaldicottGuardian ? [{
+      icon: Shield,
+      label: 'Caldicott Dashboard',
+      href: '/caldicott'
+    }] : [])
+  ];
   return <aside className={cn("h-screen bg-sidebar flex flex-col border-r border-sidebar-border transition-all duration-300", collapsed ? "w-16" : "w-64")}>
       {/* Header spacer */}
       <div className="p-4 border-b border-sidebar-border" />
 
       {/* Navigation */}
       <nav className="flex-1 p-3 space-y-1">
-        {navItems.map(item => {
+        {visibleNavItems.map(item => {
         const isActive = location.pathname === item.href;
         return <Link key={item.href} to={item.href} className={cn("flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors", isActive ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground")}>
               <item.icon className="h-5 w-5 shrink-0" />
