@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -10,6 +10,7 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { usePatientAccessLog } from '@/hooks/usePatientAccessLog';
 import { 
   User, Heart, Activity, Cigarette, Wine, Scale, Ruler, 
   Calendar, AlertTriangle, CheckCircle, XCircle, Brain,
@@ -97,6 +98,14 @@ export function PatientDetailPanel({ patientId, isOpen, onClose }: PatientDetail
   const queryClient = useQueryClient();
   const [extractText, setExtractText] = useState('');
   const [showExtractDialog, setShowExtractDialog] = useState(false);
+  const { logPatientView, logPatientEdit } = usePatientAccessLog();
+
+  // ICO/CQC Compliance: Log patient data access when panel opens
+  useEffect(() => {
+    if (isOpen && patientId) {
+      logPatientView(patientId, ['all']);
+    }
+  }, [isOpen, patientId, logPatientView]);
 
   // AI extraction mutation
   const extractMutation = useMutation({
@@ -108,6 +117,8 @@ export function PatientDetailPanel({ patientId, isOpen, onClose }: PatientDetail
       return data;
     },
     onSuccess: () => {
+      // ICO/CQC Compliance: Log AI extraction as edit operation
+      logPatientEdit(patientId, ['ai_extracted_data']);
       toast({ title: 'Data extracted successfully', description: 'Patient information has been updated with AI-extracted data.' });
       queryClient.invalidateQueries({ queryKey: ['patient-detail', patientId] });
       setShowExtractDialog(false);

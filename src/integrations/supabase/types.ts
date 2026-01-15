@@ -576,6 +576,47 @@ export type Database = {
           },
         ]
       }
+      patient_access_log: {
+        Row: {
+          access_type: string
+          accessed_fields: string[] | null
+          created_at: string | null
+          id: string
+          ip_address: string | null
+          patient_id: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          access_type: string
+          accessed_fields?: string[] | null
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          patient_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          access_type?: string
+          accessed_fields?: string[] | null
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          patient_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patient_access_log_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       patient_pseudonyms: {
         Row: {
           anonymous_id: string
@@ -724,6 +765,7 @@ export type Database = {
           created_at: string
           full_name: string
           id: string
+          is_caldicott_guardian: boolean | null
           role: string
           updated_at: string
           user_id: string
@@ -732,6 +774,7 @@ export type Database = {
           created_at?: string
           full_name: string
           id?: string
+          is_caldicott_guardian?: boolean | null
           role?: string
           updated_at?: string
           user_id: string
@@ -740,6 +783,7 @@ export type Database = {
           created_at?: string
           full_name?: string
           id?: string
+          is_caldicott_guardian?: boolean | null
           role?: string
           updated_at?: string
           user_id?: string
@@ -790,6 +834,10 @@ export type Database = {
     }
     Functions: {
       cleanup_expired_transcripts: { Args: never; Returns: number }
+      clear_call_sensitive_data: {
+        Args: { p_call_id: string }
+        Returns: boolean
+      }
       gdpr_erase_patient_data: {
         Args: {
           p_patient_id: string
@@ -807,6 +855,17 @@ export type Database = {
           p_call_id: string
           p_details?: Json
           p_ip_address?: string
+        }
+        Returns: string
+      }
+      log_patient_access: {
+        Args: {
+          p_access_type: string
+          p_accessed_fields?: string[]
+          p_ip_address?: string
+          p_patient_id: string
+          p_user_agent?: string
+          p_user_id: string
         }
         Returns: string
       }

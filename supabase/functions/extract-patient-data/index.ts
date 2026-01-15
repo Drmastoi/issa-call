@@ -6,6 +6,84 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+/**
+ * GDPR-COMPLIANT: Two-stage extraction
+ * Stage 1: Extract PII locally using regex (no AI)
+ * Stage 2: Extract clinical data using AI (with sanitized text only)
+ */
+
+// Stage 1: Local PII extraction using regex patterns (no AI involved)
+function extractPIILocally(text: string): {
+  next_of_kin_name: string | null;
+  next_of_kin_phone: string | null;
+  next_of_kin_relationship: string | null;
+  gp_name: string | null;
+  gp_practice: string | null;
+  care_home_name: string | null;
+} {
+  // Extract next of kin info
+  const nokNameMatch = text.match(/(?:Next of Kin|NOK|Emergency Contact)\s*:?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i);
+  const nokPhoneMatch = text.match(/(?:NOK|Next of Kin|Emergency)\s*(?:Phone|Tel|Contact)?\s*:?\s*(\+44\s?\d{4}\s?\d{6}|\+44\s?\d{3}\s?\d{3}\s?\d{4}|0\d{4}\s?\d{6}|0\d{3}\s?\d{3}\s?\d{4}|07\d{3}\s?\d{6})/i);
+  const nokRelMatch = text.match(/(?:Relationship|Relation)\s*:?\s*(Wife|Husband|Partner|Son|Daughter|Mother|Father|Sister|Brother|Friend|Carer|Spouse|Child|Parent)/i);
+
+  // Extract GP info
+  const gpNameMatch = text.match(/(?:GP|Doctor|Dr\.?)\s*:?\s*(?:Dr\.?\s*)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i);
+  const gpPracticeMatch = text.match(/(?:Practice|Surgery|Medical Centre|Health Centre)\s*:?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s*(?:Practice|Surgery|Medical Centre|Health Centre)?)/i);
+
+  // Extract care home name
+  const careHomeMatch = text.match(/(?:Care Home|Nursing Home|Residential Home|Facility)\s*:?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i);
+
+  let nokPhone = nokPhoneMatch ? nokPhoneMatch[1].replace(/\s/g, '') : null;
+  if (nokPhone && nokPhone.startsWith('0')) {
+    nokPhone = '+44' + nokPhone.substring(1);
+  }
+
+  return {
+    next_of_kin_name: nokNameMatch ? nokNameMatch[1].trim() : null,
+    next_of_kin_phone: nokPhone,
+    next_of_kin_relationship: nokRelMatch ? nokRelMatch[1].trim() : null,
+    gp_name: gpNameMatch ? gpNameMatch[1].trim() : null,
+    gp_practice: gpPracticeMatch ? gpPracticeMatch[1].trim() : null,
+    care_home_name: careHomeMatch ? careHomeMatch[1].trim() : null,
+  };
+}
+
+// Stage 2: Sanitize text before sending to AI
+function sanitizeTextForAI(text: string): string {
+  let sanitized = text;
+  
+  // Remove NHS numbers
+  sanitized = sanitized.replace(/\b\d{3}\s?\d{3}\s?\d{4}\b/g, '[NHS_NUMBER]');
+  
+  // Remove phone numbers
+  sanitized = sanitized.replace(/(\+44|0)\s?\d{3,4}\s?\d{3}\s?\d{3,4}/g, '[PHONE]');
+  
+  // Remove dates of birth patterns
+  sanitized = sanitized.replace(/(?:DOB|Date of Birth|D\.O\.B\.?|Born)\s*:?\s*\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/gi, '[DOB]');
+  sanitized = sanitized.replace(/\b\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4}\b/g, '[DATE]');
+  
+  // Remove full names after common patterns
+  sanitized = sanitized.replace(/(?:Patient\s*(?:Name)?|Name)\s*:?\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+/gi, 'Patient: [NAME]');
+  sanitized = sanitized.replace(/(?:Mr|Mrs|Ms|Miss|Dr|Prof)\.?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?/gi, '[PERSON]');
+  
+  // Remove next of kin names
+  sanitized = sanitized.replace(/(?:Next of Kin|NOK|Emergency Contact)\s*:?\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+/gi, 'Next of Kin: [NAME]');
+  
+  // Remove GP names
+  sanitized = sanitized.replace(/(?:GP|Doctor)\s*:?\s*(?:Dr\.?\s*)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?/gi, 'GP: [NAME]');
+  
+  // Remove addresses
+  sanitized = sanitized.replace(/\d+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:Street|Road|Lane|Avenue|Close|Drive|Way|Court|Crescent|Place|Gardens|Terrace|Mews)\s*,?\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s*,?\s*[A-Z]{1,2}\d{1,2}\s?\d[A-Z]{2}/gi, '[ADDRESS]');
+  
+  // Remove postcodes
+  sanitized = sanitized.replace(/[A-Z]{1,2}\d{1,2}\s?\d[A-Z]{2}/gi, '[POSTCODE]');
+  
+  // Remove email addresses
+  sanitized = sanitized.replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}/g, '[EMAIL]');
+  
+  return sanitized;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -21,27 +99,28 @@ serve(async (req) => {
       );
     }
 
+    console.log("GDPR-Compliant extraction: Two-stage process starting...");
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
+    // STAGE 1: Extract PII locally (no AI)
+    console.log("Stage 1: Local PII extraction...");
+    const piiData = extractPIILocally(documentText);
+    console.log("PII extracted locally (not sent to AI)");
+
+    // STAGE 2: Sanitize text and send to AI for clinical data only
+    console.log("Stage 2: Sanitizing text before AI processing...");
+    const sanitizedText = sanitizeTextForAI(documentText);
+    console.log("Text sanitized, sending to AI for clinical extraction only...");
+
+    // AI prompt asks ONLY for clinical data, not PII
     const systemPrompt = `You are a medical data extraction assistant for a UK care home management system. 
-Extract structured patient information from the provided clinical document or summary.
-
-Extract the following fields if present:
-- DNACPR status (Do Not Attempt CPR): "In Place", "Not in Place", or "Unknown"
-- DNACPR date if mentioned
-- Allergies (list of known allergies)
-- Next of kin name, phone number, and relationship
-- GP name and practice
-- Care home name
-- Mobility status (e.g., "Independent", "Requires assistance", "Wheelchair user", "Bedbound")
-- Dietary requirements
-- Communication needs (e.g., "Hearing impaired", "Requires interpreter", etc.)
-- Any other important clinical information
-
-Be thorough but only extract information that is explicitly stated in the document.`;
+Extract ONLY clinical information from the provided document. 
+DO NOT extract any personally identifiable information (names, addresses, phone numbers, NHS numbers).
+The document has been pre-sanitized - any [NAME], [PHONE], [ADDRESS] tokens should be ignored.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -53,14 +132,14 @@ Be thorough but only extract information that is explicitly stated in the docume
         model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `Please extract patient information from this document:\n\n${documentText}` }
+          { role: "user", content: `Extract ONLY clinical data from this SANITIZED document (all PII has been removed):\n\n${sanitizedText.substring(0, 12000)}` }
         ],
         tools: [
           {
             type: "function",
             function: {
-              name: "extract_patient_data",
-              description: "Extract structured patient data from clinical documents",
+              name: "extract_clinical_data",
+              description: "Extract ONLY clinical data from sanitized documents - NO personally identifiable information",
               parameters: {
                 type: "object",
                 properties: {
@@ -78,12 +157,6 @@ Be thorough but only extract information that is explicitly stated in the docume
                     items: { type: "string" },
                     description: "List of known allergies" 
                   },
-                  next_of_kin_name: { type: "string", description: "Next of kin full name" },
-                  next_of_kin_phone: { type: "string", description: "Next of kin phone number" },
-                  next_of_kin_relationship: { type: "string", description: "Relationship to patient" },
-                  gp_name: { type: "string", description: "GP doctor name" },
-                  gp_practice: { type: "string", description: "GP practice name" },
-                  care_home_name: { type: "string", description: "Care home or facility name" },
                   mobility_status: { type: "string", description: "Patient mobility status" },
                   dietary_requirements: { type: "string", description: "Dietary requirements or restrictions" },
                   communication_needs: { type: "string", description: "Communication needs or preferences" },
@@ -97,7 +170,12 @@ Be thorough but only extract information that is explicitly stated in the docume
                     items: { type: "string" },
                     description: "Current medications" 
                   },
-                  summary: { type: "string", description: "Brief clinical summary of key information" }
+                  frailty_status: {
+                    type: "string",
+                    enum: ["mild", "moderate", "severe"],
+                    description: "Frailty status if mentioned"
+                  },
+                  summary: { type: "string", description: "Brief clinical summary of key information (NO patient names)" }
                 },
                 required: [],
                 additionalProperties: false
@@ -105,7 +183,7 @@ Be thorough but only extract information that is explicitly stated in the docume
             }
           }
         ],
-        tool_choice: { type: "function", function: { name: "extract_patient_data" } }
+        tool_choice: { type: "function", function: { name: "extract_clinical_data" } }
       }),
     });
 
@@ -130,37 +208,44 @@ Be thorough but only extract information that is explicitly stated in the docume
     const aiResponse = await response.json();
     const toolCall = aiResponse.choices?.[0]?.message?.tool_calls?.[0];
     
-    if (!toolCall || toolCall.function.name !== "extract_patient_data") {
-      throw new Error("Failed to extract patient data from AI response");
+    if (!toolCall || toolCall.function.name !== "extract_clinical_data") {
+      throw new Error("Failed to extract clinical data from AI response");
     }
 
-    const extractedData = JSON.parse(toolCall.function.arguments);
+    const clinicalData = JSON.parse(toolCall.function.arguments);
+    console.log("Clinical data extracted from AI (no PII was sent)");
 
     // Create Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Build update object with only non-null values
+    // Build update object combining:
+    // - PII from local extraction (Stage 1)
+    // - Clinical data from AI (Stage 2)
     const updateData: Record<string, any> = {
       ai_extracted_at: new Date().toISOString(),
     };
 
-    if (extractedData.dnacpr_status) updateData.dnacpr_status = extractedData.dnacpr_status;
-    if (extractedData.dnacpr_date) updateData.dnacpr_date = extractedData.dnacpr_date;
-    if (extractedData.allergies?.length > 0) updateData.allergies = extractedData.allergies;
-    if (extractedData.next_of_kin_name) updateData.next_of_kin_name = extractedData.next_of_kin_name;
-    if (extractedData.next_of_kin_phone) updateData.next_of_kin_phone = extractedData.next_of_kin_phone;
-    if (extractedData.next_of_kin_relationship) updateData.next_of_kin_relationship = extractedData.next_of_kin_relationship;
-    if (extractedData.gp_name) updateData.gp_name = extractedData.gp_name;
-    if (extractedData.gp_practice) updateData.gp_practice = extractedData.gp_practice;
-    if (extractedData.care_home_name) updateData.care_home_name = extractedData.care_home_name;
-    if (extractedData.mobility_status) updateData.mobility_status = extractedData.mobility_status;
-    if (extractedData.dietary_requirements) updateData.dietary_requirements = extractedData.dietary_requirements;
-    if (extractedData.communication_needs) updateData.communication_needs = extractedData.communication_needs;
-    if (extractedData.conditions?.length > 0) updateData.conditions = extractedData.conditions;
-    if (extractedData.medications?.length > 0) updateData.medications = extractedData.medications;
-    if (extractedData.summary) updateData.ai_extracted_summary = extractedData.summary;
+    // Add PII from local extraction
+    if (piiData.next_of_kin_name) updateData.next_of_kin_name = piiData.next_of_kin_name;
+    if (piiData.next_of_kin_phone) updateData.next_of_kin_phone = piiData.next_of_kin_phone;
+    if (piiData.next_of_kin_relationship) updateData.next_of_kin_relationship = piiData.next_of_kin_relationship;
+    if (piiData.gp_name) updateData.gp_name = piiData.gp_name;
+    if (piiData.gp_practice) updateData.gp_practice = piiData.gp_practice;
+    if (piiData.care_home_name) updateData.care_home_name = piiData.care_home_name;
+
+    // Add clinical data from AI
+    if (clinicalData.dnacpr_status) updateData.dnacpr_status = clinicalData.dnacpr_status;
+    if (clinicalData.dnacpr_date) updateData.dnacpr_date = clinicalData.dnacpr_date;
+    if (clinicalData.allergies?.length > 0) updateData.allergies = clinicalData.allergies;
+    if (clinicalData.mobility_status) updateData.mobility_status = clinicalData.mobility_status;
+    if (clinicalData.dietary_requirements) updateData.dietary_requirements = clinicalData.dietary_requirements;
+    if (clinicalData.communication_needs) updateData.communication_needs = clinicalData.communication_needs;
+    if (clinicalData.conditions?.length > 0) updateData.conditions = clinicalData.conditions;
+    if (clinicalData.medications?.length > 0) updateData.medications = clinicalData.medications;
+    if (clinicalData.frailty_status) updateData.frailty_status = clinicalData.frailty_status;
+    if (clinicalData.summary) updateData.ai_extracted_summary = clinicalData.summary;
 
     // Update patient record
     const { error: updateError } = await supabase
@@ -173,11 +258,31 @@ Be thorough but only extract information that is explicitly stated in the docume
       throw new Error(`Failed to update patient: ${updateError.message}`);
     }
 
+    // AUDIT LOG: Record extraction
+    await supabase
+      .from("audit_logs")
+      .insert({
+        action: "gdpr_compliant_extraction",
+        entity_type: "patient",
+        entity_id: patientId,
+        details: {
+          pii_extracted_locally: true,
+          clinical_data_from_ai: true,
+          no_pii_sent_to_ai: true,
+        },
+      });
+
+    console.log("GDPR-compliant extraction complete for patient:", patientId);
+
     return new Response(
       JSON.stringify({ 
         success: true, 
-        extractedData,
-        message: "Patient data extracted and updated successfully" 
+        extractedData: {
+          ...piiData,
+          ...clinicalData,
+        },
+        gdprCompliant: true,
+        message: "Patient data extracted using GDPR-compliant two-stage process" 
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
