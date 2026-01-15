@@ -63,14 +63,14 @@ export default function CaldicottDashboard() {
   const { data: pendingRequests = [], isLoading: requestsLoading } = useQuery({
     queryKey: ['data-sharing-requests', 'pending'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('data_sharing_requests')
         .select('*')
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as DataSharingRequest[];
+      return (data || []) as DataSharingRequest[];
     },
     enabled: isCaldicottGuardian,
   });
@@ -79,14 +79,14 @@ export default function CaldicottDashboard() {
   const { data: allRequests = [] } = useQuery({
     queryKey: ['data-sharing-requests', 'all'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('data_sharing_requests')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(100);
 
       if (error) throw error;
-      return data as DataSharingRequest[];
+      return (data || []) as DataSharingRequest[];
     },
     enabled: isCaldicottGuardian,
   });
@@ -102,7 +102,7 @@ export default function CaldicottDashboard() {
         .limit(200);
 
       if (error) throw error;
-      return data as AuditLog[];
+      return (data || []) as AuditLog[];
     },
     enabled: isCaldicottGuardian,
   });
@@ -118,7 +118,7 @@ export default function CaldicottDashboard() {
         .limit(200);
 
       if (error) throw error;
-      return data as PatientAccessLog[];
+      return (data || []) as PatientAccessLog[];
     },
     enabled: isCaldicottGuardian,
   });

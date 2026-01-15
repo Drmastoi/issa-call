@@ -33,11 +33,11 @@ export function useUserRole(): UserRoles {
       }
 
       try {
-        // Use raw query since user_roles may not be in generated types yet
-        const { data, error } = await supabase
-          .from('user_roles' as 'profiles')
+        // Use any cast since user_roles may not be in generated types yet
+        const { data, error } = await (supabase as any)
+          .from('user_roles')
           .select('role')
-          .eq('user_id', user.id) as { data: UserRoleRow[] | null; error: Error | null };
+          .eq('user_id', user.id);
 
         if (error) {
           console.error('Error fetching user roles:', error);
