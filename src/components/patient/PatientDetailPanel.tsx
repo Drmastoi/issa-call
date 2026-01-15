@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -97,6 +97,7 @@ export function PatientDetailPanel({ patientId, isOpen, onClose }: PatientDetail
   const queryClient = useQueryClient();
   const [extractText, setExtractText] = useState('');
   const [showExtractDialog, setShowExtractDialog] = useState(false);
+  const [hasAutoPrompted, setHasAutoPrompted] = useState(false);
 
   // AI extraction mutation
   const extractMutation = useMutation({
@@ -186,6 +187,36 @@ export function PatientDetailPanel({ patientId, isOpen, onClose }: PatientDetail
   });
 
   const latestResponse = callResponses[0];
+
+  // Check if patient data is sparse and auto-open extraction dialog
+  useEffect(() => {
+    if (patient && isOpen && !hasAutoPrompted && !patient.ai_extracted_at) {
+      // Count how many key fields are missing
+      const missingFields = [
+        !patient.date_of_birth,
+        !patient.allergies || patient.allergies.length === 0,
+        !patient.next_of_kin_name,
+        !patient.dnacpr_status,
+        !patient.gp_name,
+        !patient.mobility_status,
+        !patient.care_home_name,
+        !patient.communication_needs,
+      ].filter(Boolean).length;
+
+      // If more than 5 key fields are missing and never extracted, auto-open
+      if (missingFields >= 5) {
+        setShowExtractDialog(true);
+        setHasAutoPrompted(true);
+      }
+    }
+  }, [patient, isOpen, hasAutoPrompted]);
+
+  // Reset auto-prompt state when panel closes
+  useEffect(() => {
+    if (!isOpen) {
+      setHasAutoPrompted(false);
+    }
+  }, [isOpen]);
 
   // Calculate age from DOB
   const calculateAge = (dob: string | null) => {
