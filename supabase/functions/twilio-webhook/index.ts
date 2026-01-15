@@ -68,16 +68,19 @@ serve(async (req) => {
           const purposeContext = callData.purpose_context || "general health check";
 
           if (signedUrl) {
-            // Return TwiML to connect to ElevenLabs
+            const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+            const consentAudioUrl = `${SUPABASE_URL}/functions/v1/consent-audio`;
+            
+            // Return TwiML to connect to ElevenLabs with natural voice
             const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice">Thank you for your consent. Please hold while we connect you to our health assistant.</Say>
+  <Play>${consentAudioUrl}?type=thank_you</Play>
   <Connect>
     <Stream url="${signedUrl}">
       <Parameter name="purposeContext" value="${purposeContext}" />
     </Stream>
   </Connect>
-  <Say voice="alice">Thank you for your time. Your responses have been recorded. Goodbye.</Say>
+  <Play>${consentAudioUrl}?type=goodbye</Play>
 </Response>`;
             
             console.log("Returning ElevenLabs connect TwiML");
@@ -125,9 +128,12 @@ serve(async (req) => {
           });
         }
 
+        const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+        const consentAudioUrl = `${SUPABASE_URL}/functions/v1/consent-audio`;
+        
         const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice">You have declined to continue. Your GP practice may contact you by other means. Goodbye.</Say>
+  <Play>${consentAudioUrl}?type=declined</Play>
   <Hangup/>
 </Response>`;
         
@@ -140,12 +146,14 @@ serve(async (req) => {
       } else {
         // Invalid input - ask again
         console.log("Invalid digit received:", digits);
+        const consentAudioUrl = `${SUPABASE_URL}/functions/v1/consent-audio`;
+        
         const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Gather numDigits="1" action="${SUPABASE_URL}/functions/v1/twilio-webhook" method="POST" timeout="10">
-    <Say voice="alice">Sorry, I didn't understand. Please press 1 to consent and continue, or press 2 to decline.</Say>
+    <Play>${consentAudioUrl}?type=invalid_input</Play>
   </Gather>
-  <Say voice="alice">We did not receive a response. The call will now end. Goodbye.</Say>
+  <Play>${consentAudioUrl}?type=no_response</Play>
   <Hangup/>
 </Response>`;
         
