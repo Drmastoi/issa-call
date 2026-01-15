@@ -4,6 +4,10 @@ import { useAuth } from './useAuth';
 
 type AppRole = 'staff' | 'admin' | 'caldicott_guardian';
 
+interface UserRoleRow {
+  role: string;
+}
+
 interface UserRoles {
   roles: AppRole[];
   isCaldicottGuardian: boolean;
@@ -29,10 +33,11 @@ export function useUserRole(): UserRoles {
       }
 
       try {
+        // Use raw query since user_roles may not be in generated types yet
         const { data, error } = await supabase
-          .from('user_roles')
+          .from('user_roles' as 'profiles')
           .select('role')
-          .eq('user_id', user.id);
+          .eq('user_id', user.id) as { data: UserRoleRow[] | null; error: Error | null };
 
         if (error) {
           console.error('Error fetching user roles:', error);
