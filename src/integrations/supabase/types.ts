@@ -255,6 +255,7 @@ export type Database = {
           blood_pressure_diastolic: number | null
           blood_pressure_systolic: number | null
           call_id: string
+          clinical_notes: string | null
           collected_at: string
           created_at: string
           height_cm: number | null
@@ -263,6 +264,9 @@ export type Database = {
           patient_id: string
           pulse_rate: number | null
           smoking_status: string | null
+          verification_status: string | null
+          verified_at: string | null
+          verified_by: string | null
           weight_kg: number | null
         }
         Insert: {
@@ -270,6 +274,7 @@ export type Database = {
           blood_pressure_diastolic?: number | null
           blood_pressure_systolic?: number | null
           call_id: string
+          clinical_notes?: string | null
           collected_at?: string
           created_at?: string
           height_cm?: number | null
@@ -278,6 +283,9 @@ export type Database = {
           patient_id: string
           pulse_rate?: number | null
           smoking_status?: string | null
+          verification_status?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
           weight_kg?: number | null
         }
         Update: {
@@ -285,6 +293,7 @@ export type Database = {
           blood_pressure_diastolic?: number | null
           blood_pressure_systolic?: number | null
           call_id?: string
+          clinical_notes?: string | null
           collected_at?: string
           created_at?: string
           height_cm?: number | null
@@ -293,6 +302,9 @@ export type Database = {
           patient_id?: string
           pulse_rate?: number | null
           smoking_status?: string | null
+          verification_status?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
           weight_kg?: number | null
         }
         Relationships: [
@@ -317,11 +329,15 @@ export type Database = {
           attempt_number: number
           batch_id: string | null
           consent_given_at: string | null
+          consent_method: string | null
+          consent_verified: boolean | null
           created_at: string
           duration_seconds: number | null
+          elevenlabs_signed_url: string | null
           ended_at: string | null
           id: string
           patient_id: string
+          purpose_context: string | null
           recording_disclosure_played: boolean | null
           retention_days: number | null
           started_at: string | null
@@ -334,11 +350,15 @@ export type Database = {
           attempt_number?: number
           batch_id?: string | null
           consent_given_at?: string | null
+          consent_method?: string | null
+          consent_verified?: boolean | null
           created_at?: string
           duration_seconds?: number | null
+          elevenlabs_signed_url?: string | null
           ended_at?: string | null
           id?: string
           patient_id: string
+          purpose_context?: string | null
           recording_disclosure_played?: boolean | null
           retention_days?: number | null
           started_at?: string | null
@@ -351,11 +371,15 @@ export type Database = {
           attempt_number?: number
           batch_id?: string | null
           consent_given_at?: string | null
+          consent_method?: string | null
+          consent_verified?: boolean | null
           created_at?: string
           duration_seconds?: number | null
+          elevenlabs_signed_url?: string | null
           ended_at?: string | null
           id?: string
           patient_id?: string
+          purpose_context?: string | null
           recording_disclosure_played?: boolean | null
           retention_days?: number | null
           started_at?: string | null
@@ -374,6 +398,53 @@ export type Database = {
           },
           {
             foreignKeyName: "calls_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      data_subject_requests: {
+        Row: {
+          created_at: string | null
+          id: string
+          patient_id: string | null
+          processed_at: string | null
+          processed_by: string | null
+          rejection_reason: string | null
+          request_type: string
+          requested_at: string | null
+          response_data: Json | null
+          status: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          patient_id?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
+          rejection_reason?: string | null
+          request_type: string
+          requested_at?: string | null
+          response_data?: Json | null
+          status?: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          patient_id?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
+          rejection_reason?: string | null
+          request_type?: string
+          requested_at?: string | null
+          response_data?: Json | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_subject_requests_patient_id_fkey"
             columns: ["patient_id"]
             isOneToOne: false
             referencedRelation: "patients"
@@ -718,6 +789,15 @@ export type Database = {
       }
     }
     Functions: {
+      cleanup_expired_transcripts: { Args: never; Returns: number }
+      gdpr_erase_patient_data: {
+        Args: {
+          p_patient_id: string
+          p_processed_by: string
+          p_request_id: string
+        }
+        Returns: boolean
+      }
       generate_call_reference: { Args: { p_call_id: string }; Returns: string }
       get_anonymous_id: { Args: { p_patient_id: string }; Returns: string }
       log_call_audit: {
@@ -730,9 +810,25 @@ export type Database = {
         }
         Returns: string
       }
+      reject_call_response: {
+        Args: {
+          p_rejected_by: string
+          p_rejection_reason: string
+          p_response_id: string
+        }
+        Returns: boolean
+      }
       resolve_anonymous_id: {
         Args: { p_anonymous_id: string }
         Returns: string
+      }
+      verify_call_response: {
+        Args: {
+          p_clinical_notes?: string
+          p_response_id: string
+          p_verified_by: string
+        }
+        Returns: boolean
       }
     }
     Enums: {
