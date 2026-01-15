@@ -405,6 +405,65 @@ export type Database = {
           },
         ]
       }
+      data_sharing_requests: {
+        Row: {
+          created_at: string | null
+          data_categories: string[]
+          expires_at: string | null
+          id: string
+          legal_basis: string
+          patient_id: string
+          purpose: string
+          recipient_organization: string
+          request_type: string
+          requested_by: string
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string | null
+          data_categories: string[]
+          expires_at?: string | null
+          id?: string
+          legal_basis: string
+          patient_id: string
+          purpose: string
+          recipient_organization: string
+          request_type: string
+          requested_by: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string | null
+          data_categories?: string[]
+          expires_at?: string | null
+          id?: string
+          legal_basis?: string
+          patient_id?: string
+          purpose?: string
+          recipient_organization?: string
+          request_type?: string
+          requested_by?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_sharing_requests_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       data_subject_requests: {
         Row: {
           created_at: string | null
@@ -790,6 +849,30 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          granted_at: string | null
+          granted_by: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          granted_at?: string | null
+          granted_by?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          granted_at?: string | null
+          granted_by?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       alerts_analytics_aggregate: {
@@ -848,6 +931,14 @@ export type Database = {
       }
       generate_call_reference: { Args: { p_call_id: string }; Returns: string }
       get_anonymous_id: { Args: { p_patient_id: string }; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_caldicott_guardian: { Args: { _user_id: string }; Returns: boolean }
       log_call_audit: {
         Args: {
           p_action: string
@@ -881,6 +972,10 @@ export type Database = {
         Args: { p_anonymous_id: string }
         Returns: string
       }
+      review_data_sharing_request: {
+        Args: { p_decision: string; p_notes?: string; p_request_id: string }
+        Returns: boolean
+      }
       verify_call_response: {
         Args: {
           p_clinical_notes?: string
@@ -891,7 +986,7 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "staff" | "admin" | "caldicott_guardian"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1018,6 +1113,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["staff", "admin", "caldicott_guardian"],
+    },
   },
 } as const

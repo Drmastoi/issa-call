@@ -16,6 +16,7 @@ import QOFReports from "./pages/QOFReports";
 import MediTask from "./pages/MediTask";
 import AIAnalytics from "./pages/AIAnalytics";
 import ClinicalVerification from "./pages/ClinicalVerification";
+import CaldicottDashboard from "./pages/CaldicottDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -41,6 +42,7 @@ const App = () => (
               <Route path="/qof-reports" element={<QOFReports />} />
               <Route path="/meditask" element={<MediTask />} />
               <Route path="/clinical-verification" element={<ClinicalVerification />} />
+              <Route path="/caldicott" element={<CaldicottDashboard />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
