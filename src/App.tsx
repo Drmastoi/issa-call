@@ -15,6 +15,7 @@ import Settings from "./pages/Settings";
 import QOFReports from "./pages/QOFReports";
 import MediTask from "./pages/MediTask";
 import AIAnalytics from "./pages/AIAnalytics";
+import ClinicalVerification from "./pages/ClinicalVerification";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,6 +40,7 @@ const App = () => (
               <Route path="/profile" element={<Settings />} />
               <Route path="/qof-reports" element={<QOFReports />} />
               <Route path="/meditask" element={<MediTask />} />
+              <Route path="/clinical-verification" element={<ClinicalVerification />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

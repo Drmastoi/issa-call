@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Calendar, Phone, FileDown, Settings, LogOut, ChevronLeft, ChevronRight, ClipboardList, Brain, User } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Phone, FileDown, Settings, LogOut, ChevronLeft, ChevronRight, ClipboardList, Brain, User, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -33,6 +33,10 @@ const navItems = [{
   icon: ClipboardList,
   label: 'Care Home Tasks',
   href: '/meditask'
+}, {
+  icon: ShieldCheck,
+  label: 'Clinical Verification',
+  href: '/clinical-verification'
 }, {
   icon: User,
   label: 'Profile',
