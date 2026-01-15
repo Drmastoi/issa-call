@@ -113,18 +113,31 @@ serve(async (req) => {
       purposeContext = `Please ask the following specific questions: ${customQuestions.join("; ")}`;
     }
     
-    // GDPR COMPLIANT TwiML:
+    // GDPR/ICO COMPLIANT TwiML with ACTIVE CONSENT VERIFICATION:
     // 1. NO patient name in greeting (patient already knows who they are)
     // 2. ICO-compliant recording disclosure
-    // 3. Only anonymous call reference sent to ElevenLabs
-    // 4. No patient ID sent to external services
+    // 3. ACTIVE CONSENT: Patient must press 1 to consent, 2 to decline
+    // 4. Only anonymous call reference sent to ElevenLabs
+    // 5. No patient ID sent to external services
+    const consentGatherUrl = `${SUPABASE_URL}/functions/v1/twilio-webhook`;
+    
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="alice">Hello. This is an automated health check call from your GP practice.</Say>
   <Pause length="1"/>
-  <Say voice="alice">This call will be recorded for quality assurance and to update your medical records. If you do not wish to proceed, please hang up now.</Say>
-  <Pause length="2"/>
-  <Say voice="alice">Please hold while we connect you to our health assistant.</Say>
+  <Say voice="alice">This call will be recorded for quality assurance and to update your medical records.</Say>
+  <Pause length="1"/>
+  <Gather numDigits="1" action="${consentGatherUrl}" method="POST" timeout="10">
+    <Say voice="alice">To consent and continue with this call, please press 1. To decline and end this call, please press 2.</Say>
+  </Gather>
+  <Say voice="alice">We did not receive a response. The call will now end. Goodbye.</Say>
+  <Hangup/>
+</Response>`;
+
+    // TwiML for after consent is given (used by webhook)
+    const consentedTwiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="alice">Thank you for your consent. Please hold while we connect you to our health assistant.</Say>
   <Connect>
     <Stream url="${signed_url}">
       <Parameter name="callReference" value="${callReference}" />
@@ -133,6 +146,16 @@ serve(async (req) => {
   </Connect>
   <Say voice="alice">Thank you for your time. Your responses have been recorded. Goodbye.</Say>
 </Response>`;
+
+    // Store the ElevenLabs signed URL and context for use after consent verification
+    // The webhook will use these to connect the patient to the AI assistant
+    await supabase
+      .from("calls")
+      .update({
+        elevenlabs_signed_url: signed_url,
+        purpose_context: purposeContext,
+      })
+      .eq("id", callId);
 
     // Initiate the call via Twilio
     const twilioAuth = btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`);

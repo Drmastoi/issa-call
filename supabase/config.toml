@@ -23,3 +23,12 @@ verify_jwt = false
 
 [functions.ai-chat-agent]
 verify_jwt = false
+
+[functions.gdpr-data-export]
+verify_jwt = true
+
+[functions.gdpr-data-erasure]
+verify_jwt = true
+
+[functions.retention-cleanup]
+verify_jwt = false
