@@ -113,14 +113,14 @@ serve(async (req) => {
       purposeContext = `Please ask the following specific questions: ${customQuestions.join("; ")}`;
     }
     
-    // GDPR/ICO COMPLIANT TwiML with ACTIVE CONSENT VERIFICATION:
+    // GDPR/ICO COMPLIANT TwiML with VERBAL CONSENT VERIFICATION:
     // 1. NO patient name in greeting (patient already knows who they are)
     // 2. ICO-compliant recording disclosure
-    // 3. ACTIVE CONSENT: Patient must press 1 to consent, 2 to decline
+    // 3. VERBAL CONSENT: Patient says "yes" or "no" - easier for elderly patients
     // 4. Only anonymous call reference sent to ElevenLabs
     // 5. No patient ID sent to external services
     // 6. Uses ElevenLabs TTS for natural voice instead of robotic Twilio voice
-    const consentGatherUrl = `${SUPABASE_URL}/functions/v1/twilio-webhook`;
+    const consentSpeechUrl = `${SUPABASE_URL}/functions/v1/consent-speech`;
     const consentAudioUrl = `${SUPABASE_URL}/functions/v1/consent-audio`;
     
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -129,8 +129,8 @@ serve(async (req) => {
   <Pause length="1"/>
   <Play>${consentAudioUrl}?type=recording</Play>
   <Pause length="1"/>
-  <Gather numDigits="1" action="${consentGatherUrl}" method="POST" timeout="10">
-    <Play>${consentAudioUrl}?type=consent_prompt</Play>
+  <Gather input="speech" action="${consentSpeechUrl}" method="POST" timeout="8" speechTimeout="auto" language="en-GB">
+    <Play>${consentAudioUrl}?type=consent_verbal</Play>
   </Gather>
   <Play>${consentAudioUrl}?type=no_response</Play>
   <Hangup/>

@@ -5,16 +5,20 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Pre-defined consent messages for natural voice
-const CONSENT_MESSAGES = {
-  greeting: "Hello. This is an automated health check call from your GP practice.",
-  recording: "This call will be recorded for quality assurance and to update your medical records.",
-  consent_prompt: "To consent and continue with this call, please press 1. To decline and end this call, please press 2.",
-  no_response: "We did not receive a response. The call will now end. Goodbye.",
-  thank_you: "Thank you for your consent. Please hold while we connect you to our health assistant.",
-  declined: "You have declined to continue. Your GP practice may contact you by other means. Goodbye.",
-  invalid_input: "Sorry, I didn't understand. Please press 1 to consent and continue, or press 2 to decline.",
-  goodbye: "Thank you for your time. Your responses have been recorded. Goodbye.",
+// Pre-defined consent messages - natural, conversational tone
+const CONSENT_MESSAGES: Record<string, string> = {
+  greeting: "Hello, this is a call from your GP surgery. We're reaching out to collect some health information as part of your ongoing care.",
+  recording: "This call will be recorded for quality and training purposes, and to accurately capture your health information.",
+  consent_verbal: "Do you consent to continue with this call? Please say yes to continue, or no if you'd prefer not to.",
+  thank_you: "Thank you for your consent. Please hold while I connect you to our health assistant.",
+  declined: "No problem. We understand. If you'd like to speak with us, please call the surgery directly. Goodbye.",
+  goodbye: "Thank you for your time. Your responses have been recorded and will be reviewed by your healthcare team. Take care and goodbye.",
+  no_response: "I didn't hear a response. If you'd like to speak with us, please call the surgery directly. Goodbye.",
+  error: "We're sorry, but we're experiencing technical difficulties. Please call the surgery directly. Goodbye.",
+  unclear_response: "I'm sorry, I didn't quite catch that. Let me ask again.",
+  // Legacy DTMF messages (kept for backwards compatibility)
+  consent_prompt: "Do you consent to continue with this call? Please say yes to continue, or no if you'd prefer not to.",
+  invalid_input: "I didn't understand your response. Let me ask again."
 };
 
 serve(async (req) => {
@@ -60,9 +64,9 @@ serve(async (req) => {
           text,
           model_id: "eleven_turbo_v2_5",
           voice_settings: {
-            stability: 0.7,
-            similarity_boost: 0.75,
-            style: 0.3,
+            stability: 0.6,
+            similarity_boost: 0.8,
+            style: 0.4,
             use_speaker_boost: true,
           },
         }),
@@ -72,7 +76,7 @@ serve(async (req) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error("ElevenLabs TTS error:", errorText);
-      throw new Error(`ElevenLabs TTS failed: ${errorText}`);
+      throw new Error(`ElevenLabs API error: ${response.status}`);
     }
 
     const audioBuffer = await response.arrayBuffer();
@@ -84,9 +88,8 @@ serve(async (req) => {
         "Cache-Control": "public, max-age=86400", // Cache for 24 hours
       },
     });
-
   } catch (error) {
-    console.error("Consent audio error:", error);
+    console.error("Error generating consent audio:", error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
