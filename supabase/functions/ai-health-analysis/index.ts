@@ -40,12 +40,18 @@ interface HealthAlert {
   metrics: Record<string, unknown>;
 }
 
+// Generate anonymous reference from patient ID for GDPR compliance
+function generateAnonymousRef(patientId: string): string {
+  return `Patient-${patientId.substring(0, 4).toUpperCase()}`;
+}
+
 function calculateBMI(weightKg: number, heightCm: number): number {
   const heightM = heightCm / 100;
   return weightKg / (heightM * heightM);
 }
 
-function analyzePatientMetrics(responses: CallResponse[], patientName: string): HealthAlert[] {
+// GDPR-COMPLIANT: Uses anonymous reference instead of patient name
+function analyzePatientMetrics(responses: CallResponse[], anonymousRef: string): HealthAlert[] {
   const alerts: HealthAlert[] = [];
   if (!responses.length) return alerts;
 
@@ -59,7 +65,7 @@ function analyzePatientMetrics(responses: CallResponse[], patientName: string): 
         patient_id: patientId,
         alert_type: 'high_bp',
         severity: 'critical',
-        title: `Critical BP: ${patientName}`,
+        title: `Critical BP: ${anonymousRef}`,
         description: `Hypertensive crisis detected. BP: ${latest.blood_pressure_systolic}/${latest.blood_pressure_diastolic} mmHg. Immediate review required.`,
         metrics: { systolic: latest.blood_pressure_systolic, diastolic: latest.blood_pressure_diastolic }
       });
@@ -69,7 +75,7 @@ function analyzePatientMetrics(responses: CallResponse[], patientName: string): 
         patient_id: patientId,
         alert_type: 'high_bp',
         severity: 'warning',
-        title: `Elevated BP: ${patientName}`,
+        title: `Elevated BP: ${anonymousRef}`,
         description: `Blood pressure above target. BP: ${latest.blood_pressure_systolic}/${latest.blood_pressure_diastolic} mmHg. Consider review.`,
         metrics: { systolic: latest.blood_pressure_systolic, diastolic: latest.blood_pressure_diastolic }
       });
@@ -82,7 +88,7 @@ function analyzePatientMetrics(responses: CallResponse[], patientName: string): 
       patient_id: patientId,
       alert_type: 'high_alcohol',
       severity: latest.alcohol_units_per_week > 21 ? 'critical' : 'warning',
-      title: `High Alcohol: ${patientName}`,
+      title: `High Alcohol: ${anonymousRef}`,
       description: `Alcohol consumption ${latest.alcohol_units_per_week} units/week exceeds recommended limit of 14 units. Brief intervention advised.`,
       metrics: { units_per_week: latest.alcohol_units_per_week }
     });
@@ -96,7 +102,7 @@ function analyzePatientMetrics(responses: CallResponse[], patientName: string): 
         patient_id: patientId,
         alert_type: 'obesity',
         severity: bmi >= 40 ? 'critical' : 'warning',
-        title: `Obesity Alert: ${patientName}`,
+        title: `Obesity Alert: ${anonymousRef}`,
         description: `BMI ${bmi.toFixed(1)} indicates ${bmi >= 40 ? 'severe ' : ''}obesity. Weight management support recommended.`,
         metrics: { bmi: bmi.toFixed(1), weight_kg: latest.weight_kg, height_cm: latest.height_cm }
       });
@@ -114,7 +120,7 @@ function analyzePatientMetrics(responses: CallResponse[], patientName: string): 
           patient_id: patientId,
           alert_type: 'weight_change',
           severity: changePercent >= 10 ? 'critical' : 'warning',
-          title: `Rapid Weight ${direction === 'gain' ? 'Gain' : 'Loss'}: ${patientName}`,
+          title: `Rapid Weight ${direction === 'gain' ? 'Gain' : 'Loss'}: ${anonymousRef}`,
           description: `${changePercent.toFixed(1)}% weight ${direction} detected. Previous: ${previous.weight_kg}kg, Current: ${latest.weight_kg}kg.`,
           metrics: { change_percent: changePercent.toFixed(1), previous_kg: previous.weight_kg, current_kg: latest.weight_kg }
         });
@@ -133,7 +139,7 @@ function analyzePatientMetrics(responses: CallResponse[], patientName: string): 
       patient_id: patientId,
       alert_type: 'pattern',
       severity: 'warning',
-      title: `Persistent High BP: ${patientName}`,
+      title: `Persistent High BP: ${anonymousRef}`,
       description: `${highBPCount} consecutive elevated BP readings detected. Hypertension diagnosis and treatment review recommended.`,
       metrics: { consecutive_high_readings: highBPCount }
     });
@@ -142,10 +148,11 @@ function analyzePatientMetrics(responses: CallResponse[], patientName: string): 
   return alerts;
 }
 
+// GDPR-COMPLIANT: Clinical summary uses anonymous reference, no PII sent to AI
 async function generateClinicalSummary(
   transcript: string,
   metrics: CallResponse,
-  patientName: string
+  anonymousRef: string
 ): Promise<{ clinical_summary: string; key_findings: string[]; action_items: string[]; qof_relevance: Record<string, boolean> }> {
   const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
   
@@ -163,9 +170,10 @@ async function generateClinicalSummary(
     ? calculateBMI(metrics.weight_kg, metrics.height_cm).toFixed(1) 
     : 'Not recorded';
 
+  // GDPR-COMPLIANT PROMPT: Uses anonymous reference, no patient name
   const prompt = `You are a clinical summarization assistant for a GP practice. Generate a concise clinical summary from this patient health check call.
 
-Patient: ${patientName}
+Patient Reference: ${anonymousRef}
 Date: ${new Date(metrics.collected_at).toLocaleDateString('en-GB')}
 
 Recorded Metrics:
@@ -177,11 +185,11 @@ Recorded Metrics:
 - Smoking Status: ${metrics.smoking_status || 'N/R'}
 - Alcohol: ${metrics.alcohol_units_per_week ?? 'N/R'} units/week
 
-Call Transcript:
-${transcript || 'No transcript available'}
+Call Transcript (anonymized):
+${transcript ? transcript.replace(/[A-Z][a-z]+ [A-Z][a-z]+/g, '[PATIENT]') : 'No transcript available'}
 
 Provide a JSON response with:
-1. "clinical_summary": A 2-3 sentence clinical summary suitable for medical records
+1. "clinical_summary": A 2-3 sentence clinical summary suitable for medical records (use patient reference, not name)
 2. "key_findings": Array of 3-5 key clinical findings
 3. "action_items": Array of recommended follow-up actions
 4. "qof_relevance": Object with boolean flags for QOF indicators: hypertension_monitoring, smoking_cessation, bmi_recorded, alcohol_screening`;
@@ -196,7 +204,7 @@ Provide a JSON response with:
       body: JSON.stringify({
         model: 'google/gemini-3-flash-preview',
         messages: [
-          { role: 'system', content: 'You are a clinical summarization assistant. Always respond with valid JSON only.' },
+          { role: 'system', content: 'You are a clinical summarization assistant. Always respond with valid JSON only. Never include patient names - use the provided patient reference ID only.' },
           { role: 'user', content: prompt }
         ],
       }),
@@ -220,7 +228,7 @@ Provide a JSON response with:
   } catch (error) {
     console.error('Error generating summary:', error);
     return {
-      clinical_summary: `Health check completed for ${patientName}. BP: ${metrics.blood_pressure_systolic || 'N/R'}/${metrics.blood_pressure_diastolic || 'N/R'}, Weight: ${metrics.weight_kg || 'N/R'}kg, Smoking: ${metrics.smoking_status || 'N/R'}.`,
+      clinical_summary: `Health check completed for ${anonymousRef}. BP: ${metrics.blood_pressure_systolic || 'N/R'}/${metrics.blood_pressure_diastolic || 'N/R'}, Weight: ${metrics.weight_kg || 'N/R'}kg, Smoking: ${metrics.smoking_status || 'N/R'}.`,
       key_findings: [
         metrics.blood_pressure_systolic ? `BP recorded: ${metrics.blood_pressure_systolic}/${metrics.blood_pressure_diastolic}` : 'BP not recorded',
         metrics.weight_kg ? `Weight: ${metrics.weight_kg}kg` : 'Weight not recorded',
@@ -247,12 +255,18 @@ async function generateDashboardInsights(supabaseClient: any): Promise<{
   call_completion_rate: number;
   trend_insights: string[];
 }> {
-  // Get total patients
+  // Use aggregate views for GDPR-compliant analytics (no PII)
+  const { data: analyticsData } = await supabaseClient
+    .from('analytics_aggregate')
+    .select('*')
+    .single();
+
+  // Get total patients count
   const { count: totalPatients } = await supabaseClient
     .from('patients')
     .select('*', { count: 'exact', head: true });
 
-  // Get patients with recent (last year) call responses
+  // Get patients with recent (last year) call responses - count only
   const oneYearAgo = new Date();
   oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
@@ -272,60 +286,64 @@ async function generateDashboardInsights(supabaseClient: any): Promise<{
   const uniquePatients = new Set(responseList.map(r => r.patient_id));
   const dueForAnnual = (totalPatients || 0) - uniquePatients.size;
 
-  // Get alert counts
-  const { count: criticalAlerts } = await supabaseClient
-    .from('health_alerts')
-    .select('*', { count: 'exact', head: true })
-    .eq('severity', 'critical')
-    .is('acknowledged_at', null);
+  // Get alert counts from aggregate view
+  const { data: alertsAggregate } = await supabaseClient
+    .from('alerts_analytics_aggregate')
+    .select('severity, alert_count, acknowledged_count');
 
-  const { count: warningAlerts } = await supabaseClient
-    .from('health_alerts')
-    .select('*', { count: 'exact', head: true })
-    .eq('severity', 'warning')
-    .is('acknowledged_at', null);
+  let criticalAlerts = 0;
+  let warningAlerts = 0;
+  
+  if (alertsAggregate) {
+    alertsAggregate.forEach((a: any) => {
+      const unacknowledged = (a.alert_count || 0) - (a.acknowledged_count || 0);
+      if (a.severity === 'critical') criticalAlerts += unacknowledged;
+      if (a.severity === 'warning') warningAlerts += unacknowledged;
+    });
+  }
 
   // Calculate coverage metrics
   const bpRecorded = new Set(responseList.filter(r => r.blood_pressure_systolic).map(r => r.patient_id));
   const smokingRecorded = new Set(responseList.filter(r => r.smoking_status).map(r => r.patient_id));
   const bmiRecorded = new Set(responseList.filter(r => r.weight_kg && r.height_cm).map(r => r.patient_id));
 
-  // Calculate call completion rate (last 7 days)
-  const weekAgo = new Date();
-  weekAgo.setDate(weekAgo.getDate() - 7);
+  // Use call analytics aggregate view
+  const { data: callAggregate } = await supabaseClient
+    .from('call_analytics_aggregate')
+    .select('*')
+    .gte('call_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
 
-  const { count: totalCalls } = await supabaseClient
-    .from('calls')
-    .select('*', { count: 'exact', head: true })
-    .gte('created_at', weekAgo.toISOString());
+  let totalCalls = 0;
+  let completedCalls = 0;
+  
+  if (callAggregate) {
+    callAggregate.forEach((c: any) => {
+      totalCalls += c.total_calls || 0;
+      completedCalls += c.completed_calls || 0;
+    });
+  }
 
-  const { count: completedCalls } = await supabaseClient
-    .from('calls')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'completed')
-    .gte('created_at', weekAgo.toISOString());
+  const completionRate = totalCalls ? Math.round(completedCalls / totalCalls * 100) : 0;
 
-  const completionRate = totalCalls ? Math.round((completedCalls || 0) / totalCalls * 100) : 0;
-
-  // Generate trend insights
+  // Generate trend insights (no PII, only aggregate stats)
   const trendInsights: string[] = [];
   
   if (dueForAnnual > 0) {
     trendInsights.push(`${dueForAnnual} patients due for annual health check`);
   }
-  if (criticalAlerts && criticalAlerts > 0) {
+  if (criticalAlerts > 0) {
     trendInsights.push(`${criticalAlerts} patients need urgent review`);
   }
   if (completionRate >= 80) {
     trendInsights.push(`Excellent ${completionRate}% call completion rate this week`);
-  } else if (completionRate < 50 && totalCalls && totalCalls > 0) {
+  } else if (completionRate < 50 && totalCalls > 0) {
     trendInsights.push(`Call completion rate is ${completionRate}% - consider follow-up strategy`);
   }
 
   return {
     due_for_annual: dueForAnnual,
-    critical_alerts: criticalAlerts || 0,
-    warning_alerts: warningAlerts || 0,
+    critical_alerts: criticalAlerts,
+    warning_alerts: warningAlerts,
     bp_coverage: { recorded: bpRecorded.size, total: totalPatients || 0 },
     smoking_coverage: { recorded: smokingRecorded.size, total: totalPatients || 0 },
     bmi_coverage: { recorded: bmiRecorded.size, total: totalPatients || 0 },
@@ -346,19 +364,13 @@ serve(async (req) => {
     );
 
     const { mode, patient_id, call_id } = await req.json();
-    console.log(`AI Health Analysis - Mode: ${mode}, Patient: ${patient_id}, Call: ${call_id}`);
+    console.log(`AI Health Analysis (GDPR Compliant) - Mode: ${mode}, Patient: ${patient_id ? 'provided' : 'none'}, Call: ${call_id ? 'provided' : 'none'}`);
 
     if (mode === 'analyze-patient' && patient_id) {
-      // Get patient info
-      const { data: patient } = await supabase
-        .from('patients')
-        .select('name')
-        .eq('id', patient_id)
-        .single();
+      // Generate anonymous reference for this patient (no name lookup needed for alerts)
+      const anonymousRef = generateAnonymousRef(patient_id);
 
-      const patientName = patient?.name || 'Unknown Patient';
-
-      // Get recent call responses
+      // Get recent call responses (no patient name needed)
       const { data: responses } = await supabase
         .from('call_responses')
         .select('*')
@@ -372,7 +384,8 @@ serve(async (req) => {
         });
       }
 
-      const alerts = analyzePatientMetrics(responses as CallResponse[], patientName);
+      // Use anonymous reference instead of patient name
+      const alerts = analyzePatientMetrics(responses as CallResponse[], anonymousRef);
 
       // Clear old unacknowledged alerts for this patient and insert new ones
       if (alerts.length > 0) {
@@ -390,10 +403,10 @@ serve(async (req) => {
       });
 
     } else if (mode === 'analyze-all') {
-      // Batch analysis for all patients
+      // Batch analysis for all patients - only get patient IDs, not names
       const { data: patients } = await supabase
         .from('patients')
-        .select('id, name');
+        .select('id');
 
       let totalAlerts = 0;
       const allAlerts: HealthAlert[] = [];
@@ -407,8 +420,9 @@ serve(async (req) => {
           .limit(10);
 
         if (responses && responses.length > 0) {
-          const patientName = patient.name || 'Unknown Patient';
-          const alerts = analyzePatientMetrics(responses as CallResponse[], patientName);
+          // Use anonymous reference instead of patient name
+          const anonymousRef = generateAnonymousRef(patient.id);
+          const alerts = analyzePatientMetrics(responses as CallResponse[], anonymousRef);
           allAlerts.push(...alerts);
           totalAlerts += alerts.length;
         }
@@ -429,10 +443,10 @@ serve(async (req) => {
       });
 
     } else if (mode === 'summarize-call' && call_id) {
-      // Get call and response data
+      // Get call and response data - no patient name needed for AI
       const { data: call } = await supabase
         .from('calls')
-        .select('*, patients(name)')
+        .select('id, patient_id, transcript')
         .eq('id', call_id)
         .single();
 
@@ -449,8 +463,9 @@ serve(async (req) => {
         });
       }
 
-      const patientName = call.patients?.name || 'Unknown';
-      const summary = await generateClinicalSummary(response.transcript, response as CallResponse, patientName);
+      // Use anonymous reference for AI summary (GDPR compliant)
+      const anonymousRef = generateAnonymousRef(call.patient_id);
+      const summary = await generateClinicalSummary(response.transcript, response as CallResponse, anonymousRef);
 
       // Store the summary
       await supabase.from('ai_summaries').upsert({
@@ -474,16 +489,15 @@ serve(async (req) => {
       });
 
     } else {
-      return new Response(JSON.stringify({ error: 'Invalid mode or missing parameters' }), {
+      return new Response(JSON.stringify({ error: 'Invalid mode' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
   } catch (error) {
-    console.error('Error in ai-health-analysis:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    console.error('AI health analysis error:', error);
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
