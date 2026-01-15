@@ -119,18 +119,20 @@ serve(async (req) => {
     // 3. ACTIVE CONSENT: Patient must press 1 to consent, 2 to decline
     // 4. Only anonymous call reference sent to ElevenLabs
     // 5. No patient ID sent to external services
+    // 6. Uses ElevenLabs TTS for natural voice instead of robotic Twilio voice
     const consentGatherUrl = `${SUPABASE_URL}/functions/v1/twilio-webhook`;
+    const consentAudioUrl = `${SUPABASE_URL}/functions/v1/consent-audio`;
     
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice">Hello. This is an automated health check call from your GP practice.</Say>
+  <Play>${consentAudioUrl}?type=greeting</Play>
   <Pause length="1"/>
-  <Say voice="alice">This call will be recorded for quality assurance and to update your medical records.</Say>
+  <Play>${consentAudioUrl}?type=recording</Play>
   <Pause length="1"/>
   <Gather numDigits="1" action="${consentGatherUrl}" method="POST" timeout="10">
-    <Say voice="alice">To consent and continue with this call, please press 1. To decline and end this call, please press 2.</Say>
+    <Play>${consentAudioUrl}?type=consent_prompt</Play>
   </Gather>
-  <Say voice="alice">We did not receive a response. The call will now end. Goodbye.</Say>
+  <Play>${consentAudioUrl}?type=no_response</Play>
   <Hangup/>
 </Response>`;
 
