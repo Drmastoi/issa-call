@@ -25,15 +25,21 @@ serve(async (req) => {
   try {
     const url = new URL(req.url);
     const messageType = url.searchParams.get("type") || "greeting";
-    
+
+    console.log("Consent audio request:", {
+      method: req.method,
+      type: messageType,
+      ua: req.headers.get("user-agent"),
+    });
+
     const text = CONSENT_MESSAGES[messageType as keyof typeof CONSENT_MESSAGES];
-    
+
     if (!text) {
       return new Response("Invalid message type", { status: 400, headers: corsHeaders });
     }
 
     const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
-    
+
     if (!ELEVENLABS_API_KEY) {
       throw new Error("ElevenLabs API key not configured");
     }
@@ -41,8 +47,9 @@ serve(async (req) => {
     // Use Alice voice (Xb7hH8MSUJpSbSDYk0k2) - warm, professional female voice
     const voiceId = "Xb7hH8MSUJpSbSDYk0k2";
 
+    // Twilio <Play> is most reliable with mp3/wav assets.
     const response = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=ulaw_8000`,
+      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
       {
         method: "POST",
         headers: {
@@ -70,11 +77,10 @@ serve(async (req) => {
 
     const audioBuffer = await response.arrayBuffer();
 
-    // Return audio in ulaw format (best for telephony)
     return new Response(audioBuffer, {
       headers: {
         ...corsHeaders,
-        "Content-Type": "audio/basic",
+        "Content-Type": "audio/mpeg",
         "Cache-Control": "public, max-age=86400", // Cache for 24 hours
       },
     });
