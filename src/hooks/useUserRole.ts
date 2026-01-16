@@ -2,18 +2,30 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 
-type AppRole = 'staff' | 'admin' | 'caldicott_guardian';
-
-interface UserRoleRow {
-  role: string;
-}
+export type AppRole = 'staff' | 'nurse' | 'care_home_doctor' | 'gp' | 'admin' | 'caldicott_guardian';
 
 interface UserRoles {
   roles: AppRole[];
-  isCaldicottGuardian: boolean;
+  isNurse: boolean;
+  isCareHomeDoctor: boolean;
+  isGP: boolean;
   isAdmin: boolean;
+  isCaldicottGuardian: boolean;
   loading: boolean;
+  // Helper to check if user has any of the specified roles
+  hasAnyRole: (checkRoles: AppRole[]) => boolean;
 }
+
+// Role hierarchy for access control
+export const ROLE_ACCESS = {
+  // Pages accessible by each role
+  nurse: ['/dashboard', '/calls', '/batches', '/profile'],
+  care_home_doctor: ['/dashboard', '/calls', '/batches', '/patients', '/meditask', '/clinical-verification', '/profile'],
+  gp: ['/dashboard', '/calls', '/batches', '/patients', '/meditask', '/clinical-verification', '/profile'],
+  admin: ['/dashboard', '/calls', '/batches', '/patients', '/meditask', '/clinical-verification', '/ai-analytics', '/export', '/qof-reports', '/profile', '/user-management'],
+  caldicott_guardian: ['/dashboard', '/calls', '/batches', '/patients', '/meditask', '/clinical-verification', '/ai-analytics', '/export', '/qof-reports', '/profile', '/caldicott', '/user-management'],
+  staff: ['/dashboard', '/profile'],
+} as const;
 
 /**
  * Hook to get the current user's roles from the user_roles table.
@@ -43,7 +55,7 @@ export function useUserRole(): UserRoles {
           console.error('Error fetching user roles:', error);
           setRoles([]);
         } else {
-          setRoles((data || []).map(r => r.role as AppRole));
+          setRoles((data || []).map((r: { role: string }) => r.role as AppRole));
         }
       } catch (err) {
         console.error('Error fetching user roles:', err);
@@ -56,10 +68,18 @@ export function useUserRole(): UserRoles {
     fetchRoles();
   }, [user?.id]);
 
+  const hasAnyRole = (checkRoles: AppRole[]) => {
+    return roles.some(role => checkRoles.includes(role));
+  };
+
   return {
     roles,
-    isCaldicottGuardian: roles.includes('caldicott_guardian'),
+    isNurse: roles.includes('nurse'),
+    isCareHomeDoctor: roles.includes('care_home_doctor'),
+    isGP: roles.includes('gp'),
     isAdmin: roles.includes('admin'),
+    isCaldicottGuardian: roles.includes('caldicott_guardian'),
     loading,
+    hasAnyRole,
   };
 }
