@@ -8,9 +8,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { User, Shield, Phone, History, Volume2 } from 'lucide-react';
+import { User, Shield, Phone, History, Volume2, Activity, Monitor, Lock } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ConsentVoiceSettings } from '@/components/settings/ConsentVoiceSettings';
+import { LoginActivityLog } from '@/components/settings/LoginActivityLog';
+import { ActiveSessions } from '@/components/settings/ActiveSessions';
+import { PrivacySettings } from '@/components/settings/PrivacySettings';
 
 interface Profile {
   id: string;
@@ -103,10 +106,26 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList>
+        <TabsList className="flex-wrap">
           <TabsTrigger value="profile" className="gap-2">
             <User className="h-4 w-4" />
             Profile
+          </TabsTrigger>
+          <TabsTrigger value="security" className="gap-2">
+            <Lock className="h-4 w-4" />
+            Security
+          </TabsTrigger>
+          <TabsTrigger value="activity" className="gap-2">
+            <Activity className="h-4 w-4" />
+            Activity
+          </TabsTrigger>
+          <TabsTrigger value="sessions" className="gap-2">
+            <Monitor className="h-4 w-4" />
+            Sessions
+          </TabsTrigger>
+          <TabsTrigger value="privacy" className="gap-2">
+            <Shield className="h-4 w-4" />
+            Privacy
           </TabsTrigger>
           <TabsTrigger value="calling" className="gap-2">
             <Phone className="h-4 w-4" />
@@ -114,7 +133,7 @@ export default function Settings() {
           </TabsTrigger>
           <TabsTrigger value="voice" className="gap-2">
             <Volume2 className="h-4 w-4" />
-            Voice Settings
+            Voice
           </TabsTrigger>
           <TabsTrigger value="audit" className="gap-2">
             <History className="h-4 w-4" />
@@ -123,69 +142,81 @@ export default function Settings() {
         </TabsList>
 
         <TabsContent value="profile">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Your Profile</CardTitle>
-                <CardDescription>Update your personal information</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleUpdateProfile} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input id="email" value={user?.email ?? ''} disabled />
-                    <p className="text-xs text-muted-foreground">Email cannot be changed</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="fullName">Full Name</Label>
-                    <Input
-                      id="fullName"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="role">Role</Label>
-                    <Input id="role" value={profile?.role ?? ''} disabled />
-                    <p className="text-xs text-muted-foreground">Contact an admin to change your role</p>
-                  </div>
-                  <Button type="submit" disabled={updateProfileMutation.isPending}>
-                    {updateProfileMutation.isPending ? 'Saving...' : 'Save Changes'}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Your Profile</CardTitle>
+              <CardDescription>Update your personal information</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleUpdateProfile} className="space-y-4 max-w-md">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input id="email" value={user?.email ?? ''} disabled />
+                  <p className="text-xs text-muted-foreground">Email cannot be changed</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="fullName">Full Name</Label>
+                  <Input
+                    id="fullName"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="role">Role</Label>
+                  <Input id="role" value={profile?.role ?? ''} disabled />
+                  <p className="text-xs text-muted-foreground">Contact an admin to change your role</p>
+                </div>
+                <Button type="submit" disabled={updateProfileMutation.isPending}>
+                  {updateProfileMutation.isPending ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Shield className="h-5 w-5" />
-                  Security
-                </CardTitle>
-                <CardDescription>Manage your account security</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-4 bg-muted rounded-lg">
-                  <p className="text-sm font-medium">Two-Factor Authentication</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Enhanced security is recommended for healthcare applications.
-                  </p>
-                  <Button variant="outline" className="mt-3" disabled>
-                    Coming Soon
-                  </Button>
-                </div>
-                <div className="p-4 bg-muted rounded-lg">
-                  <p className="text-sm font-medium">Change Password</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Update your password regularly for better security.
-                  </p>
-                  <Button variant="outline" className="mt-3" disabled>
-                    Coming Soon
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+        <TabsContent value="security">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                Security Settings
+              </CardTitle>
+              <CardDescription>Manage your account security</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-sm font-medium">Two-Factor Authentication</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Enhanced security is recommended for healthcare applications.
+                </p>
+                <Button variant="outline" className="mt-3" disabled>
+                  Coming Soon
+                </Button>
+              </div>
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-sm font-medium">Change Password</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Update your password regularly for better security.
+                </p>
+                <Button variant="outline" className="mt-3" disabled>
+                  Coming Soon
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="activity">
+          <LoginActivityLog />
+        </TabsContent>
+
+        <TabsContent value="sessions">
+          <ActiveSessions />
+        </TabsContent>
+
+        <TabsContent value="privacy">
+          <PrivacySettings />
         </TabsContent>
 
         <TabsContent value="calling">
@@ -201,41 +232,16 @@ export default function Settings() {
                   <p className="text-sm text-muted-foreground mb-4">
                     Twilio is used for making phone calls. Configure your Twilio credentials to enable calling.
                   </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Account SID</Label>
-                      <Input placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" disabled />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Auth Token</Label>
-                      <Input type="password" placeholder="••••••••••••••••" disabled />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Phone Number</Label>
-                      <Input placeholder="+44 xxx xxx xxxx" disabled />
-                    </div>
-                  </div>
-                  <p className="text-sm text-warning mt-4">
+                  <p className="text-sm text-warning">
                     ⚠️ Twilio integration requires additional setup. Contact support for configuration.
                   </p>
                 </div>
-
                 <div className="p-4 border border-dashed rounded-lg">
                   <h4 className="font-medium mb-2">ElevenLabs Configuration</h4>
                   <p className="text-sm text-muted-foreground mb-4">
                     ElevenLabs provides the AI voice for patient conversations.
                   </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>API Key</Label>
-                      <Input type="password" placeholder="••••••••••••••••" disabled />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Voice ID</Label>
-                      <Input placeholder="Select voice..." disabled />
-                    </div>
-                  </div>
-                  <p className="text-sm text-warning mt-4">
+                  <p className="text-sm text-warning">
                     ⚠️ ElevenLabs integration requires additional setup. Contact support for configuration.
                   </p>
                 </div>
