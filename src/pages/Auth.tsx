@@ -1,19 +1,43 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Phone, Shield, Users } from 'lucide-react';
+import { Phone, Shield, Users, FileText, Database } from 'lucide-react';
+import { PasswordStrengthIndicator, validatePassword } from '@/components/auth/PasswordStrengthIndicator';
+
+const CURRENT_POLICY_VERSION = '1.0';
 
 export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
+  const [signupPassword, setSignupPassword] = useState('');
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [dataProcessingAccepted, setDataProcessingAccepted] = useState(false);
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  const allConsentsAccepted = privacyAccepted && termsAccepted && dataProcessingAccepted;
+
+  const logLoginActivity = async (userId: string | null, email: string, eventType: string) => {
+    try {
+      await supabase.from('login_activity').insert({
+        user_id: userId,
+        email,
+        event_type: eventType,
+        user_agent: navigator.userAgent,
+      });
+    } catch (error) {
+      console.error('Failed to log login activity:', error);
+    }
+  };
 
   const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -25,12 +49,15 @@ export default function Auth() {
     const { error } = await signIn(email, password);
     
     if (error) {
+      await logLoginActivity(null, email, 'login_failed');
       toast({
         variant: 'destructive',
         title: 'Sign in failed',
         description: error.message,
       });
     } else {
+      const { data: { user } } = await supabase.auth.getUser();
+      await logLoginActivity(user?.id ?? null, email, 'login_success');
       navigate('/dashboard');
     }
     setIsLoading(false);
@@ -38,24 +65,68 @@ export default function Auth() {
 
   const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    
+    // Validate password strength
+    const { isValid, errors } = validatePassword(signupPassword);
+    if (!isValid) {
+      toast({
+        variant: 'destructive',
+        title: 'Password requirements not met',
+        description: errors[0],
+      });
+      return;
+    }
+
+    if (!allConsentsAccepted) {
+      toast({
+        variant: 'destructive',
+        title: 'Consent required',
+        description: 'Please accept all policies to create an account.',
+      });
+      return;
+    }
+
     setIsLoading(true);
     const formData = new FormData(e.currentTarget);
     const email = formData.get('email') as string;
-    const password = formData.get('password') as string;
     const fullName = formData.get('fullName') as string;
 
-    const { error } = await signUp(email, password, fullName);
+    const { error } = await signUp(email, signupPassword, fullName);
     
     if (error) {
+      await logLoginActivity(null, email, 'signup_failed');
       toast({
         variant: 'destructive',
         title: 'Sign up failed',
         description: error.message,
       });
     } else {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        // Log consent records
+        const consentTypes = ['privacy_policy', 'terms_of_service', 'data_processing'];
+        for (const consentType of consentTypes) {
+          await supabase.from('user_consent_log').insert({
+            user_id: user.id,
+            consent_type: consentType,
+            policy_version: CURRENT_POLICY_VERSION,
+            user_agent: navigator.userAgent,
+          });
+        }
+
+        // Update profile with consent version
+        await supabase.from('profiles').update({
+          consent_version_accepted: CURRENT_POLICY_VERSION,
+          consent_accepted_at: new Date().toISOString(),
+        }).eq('user_id', user.id);
+
+        await logLoginActivity(user.id, email, 'signup');
+      }
+
       toast({
         title: 'Account created',
-        description: 'You can now sign in with your credentials.',
+        description: 'Welcome to PatientCall!',
       });
       navigate('/dashboard');
     }
@@ -100,7 +171,7 @@ export default function Auth() {
               <div className="p-2 bg-sidebar-accent rounded-lg">
                 <Shield className="h-5 w-5" />
               </div>
-              <span>Secure data storage & export</span>
+              <span>GDPR compliant data handling</span>
             </div>
           </div>
         </div>
@@ -195,13 +266,69 @@ export default function Auth() {
                       id="signup-password"
                       name="password"
                       type="password"
-                      minLength={6}
+                      value={signupPassword}
+                      onChange={(e) => setSignupPassword(e.target.value)}
                       required
                     />
+                    <PasswordStrengthIndicator password={signupPassword} />
+                  </div>
+
+                  {/* GDPR Consent Checkboxes */}
+                  <div className="space-y-3 pt-2 border-t">
+                    <p className="text-sm font-medium">Required Consents</p>
+                    
+                    <div className="flex items-start space-x-3">
+                      <Checkbox
+                        id="privacy"
+                        checked={privacyAccepted}
+                        onCheckedChange={(checked) => setPrivacyAccepted(checked === true)}
+                      />
+                      <div className="grid gap-1 leading-none">
+                        <Label htmlFor="privacy" className="flex items-center gap-1.5 text-sm cursor-pointer">
+                          <FileText className="h-3.5 w-3.5" />
+                          I accept the Privacy Policy
+                        </Label>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start space-x-3">
+                      <Checkbox
+                        id="terms"
+                        checked={termsAccepted}
+                        onCheckedChange={(checked) => setTermsAccepted(checked === true)}
+                      />
+                      <div className="grid gap-1 leading-none">
+                        <Label htmlFor="terms" className="flex items-center gap-1.5 text-sm cursor-pointer">
+                          <Shield className="h-3.5 w-3.5" />
+                          I accept the Terms of Service
+                        </Label>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start space-x-3">
+                      <Checkbox
+                        id="dataProcessing"
+                        checked={dataProcessingAccepted}
+                        onCheckedChange={(checked) => setDataProcessingAccepted(checked === true)}
+                      />
+                      <div className="grid gap-1 leading-none">
+                        <Label htmlFor="dataProcessing" className="flex items-center gap-1.5 text-sm cursor-pointer">
+                          <Database className="h-3.5 w-3.5" />
+                          I consent to data processing
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          In accordance with NHS data protection standards
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
                 <CardFooter>
-                  <Button type="submit" className="w-full" disabled={isLoading}>
+                  <Button 
+                    type="submit" 
+                    className="w-full" 
+                    disabled={isLoading || !allConsentsAccepted}
+                  >
                     {isLoading ? 'Creating account...' : 'Create Account'}
                   </Button>
                 </CardFooter>

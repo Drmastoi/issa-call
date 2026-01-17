@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      active_sessions: {
+        Row: {
+          created_at: string
+          device_info: string | null
+          id: string
+          ip_address: string | null
+          last_active_at: string
+          session_token_hash: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_info?: string | null
+          id?: string
+          ip_address?: string | null
+          last_active_at?: string
+          session_token_hash: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_info?: string | null
+          id?: string
+          ip_address?: string | null
+          last_active_at?: string
+          session_token_hash?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ai_summaries: {
         Row: {
           action_items: Json | null
@@ -621,6 +651,39 @@ export type Database = {
           },
         ]
       }
+      login_activity: {
+        Row: {
+          created_at: string
+          email: string
+          event_type: string
+          id: string
+          ip_address: string | null
+          location_info: Json | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          event_type: string
+          id?: string
+          ip_address?: string | null
+          location_info?: Json | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          event_type?: string
+          id?: string
+          ip_address?: string | null
+          location_info?: Json | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       meditask_tasks: {
         Row: {
           assigned_to: string | null
@@ -860,6 +923,8 @@ export type Database = {
       }
       profiles: {
         Row: {
+          consent_accepted_at: string | null
+          consent_version_accepted: string | null
           created_at: string
           full_name: string
           id: string
@@ -869,6 +934,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          consent_accepted_at?: string | null
+          consent_version_accepted?: string | null
           created_at?: string
           full_name: string
           id?: string
@@ -878,12 +945,44 @@ export type Database = {
           user_id: string
         }
         Update: {
+          consent_accepted_at?: string | null
+          consent_version_accepted?: string | null
           created_at?: string
           full_name?: string
           id?: string
           is_caldicott_guardian?: boolean | null
           role?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_consent_log: {
+        Row: {
+          consent_type: string
+          consented_at: string
+          id: string
+          ip_address: string | null
+          policy_version: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          consent_type: string
+          consented_at?: string
+          id?: string
+          ip_address?: string | null
+          policy_version: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          consent_type?: string
+          consented_at?: string
+          id?: string
+          ip_address?: string | null
+          policy_version?: string
+          user_agent?: string | null
           user_id?: string
         }
         Relationships: []
