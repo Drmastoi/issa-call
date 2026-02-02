@@ -43,7 +43,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { QOF_INDICATORS, QOF_CATEGORIES, calculateQOFProgress } from '@/lib/qof-codes';
-import QOFActionList from '@/components/qof/QOFActionList';
+
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area, BarChart, Bar, Legend } from 'recharts';
 
 type GapFilter = 'all' | 'bp' | 'smoking' | 'no-data';
@@ -1119,7 +1119,18 @@ export default function AIAnalytics() {
           </TabsContent>
 
           <TabsContent value="actions" className="mt-6">
-            <QOFActionList />
+            <Card className="shadow-sm">
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Target className="h-12 w-12 text-primary/50 mb-4" />
+                <h3 className="text-lg font-semibold mb-2">QOF Actions Moved to AI Tasks</h3>
+                <p className="text-muted-foreground text-center mb-4">
+                  Clinical QOF actions are now integrated with AI Task Management for a unified workflow.
+                </p>
+                <Button asChild>
+                  <Link to="/ai-tasks">Go to AI Tasks</Link>
+                </Button>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
 

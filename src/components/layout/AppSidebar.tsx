@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Calendar, Phone, LogOut, ChevronLeft, ChevronRight, ClipboardList, Brain, User, ShieldCheck, Shield, UsersRound, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Phone, LogOut, ChevronLeft, ChevronRight, Brain, User, ShieldCheck, Shield, UsersRound, Sparkles, ClipboardList } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
