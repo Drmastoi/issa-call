@@ -7,6 +7,7 @@ export interface WidgetConfig {
 }
 
 const DEFAULT_LAYOUT: WidgetConfig[] = [
+  { id: 'quick-actions', title: 'Quick Actions', visible: true },
   { id: 'ai-insights', title: 'AI Intelligence', visible: true },
   { id: 'risk-alerts', title: 'Risk Alerts', visible: true },
   { id: 'qof-progress', title: 'QOF Progress', visible: true },

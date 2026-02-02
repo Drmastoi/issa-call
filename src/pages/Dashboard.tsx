@@ -12,8 +12,10 @@ import { AIInsightsPanel } from '@/components/dashboard/AIInsightsPanel';
 import { RiskAlertsWidget } from '@/components/dashboard/RiskAlertsWidget';
 import { QOFProgressPanel } from '@/components/dashboard/QOFProgressPanel';
 import { MediTaskWidget } from '@/components/dashboard/MediTaskWidget';
+import { QuickActionsWidget } from '@/components/dashboard/QuickActionsWidget';
 import { DraggableWidget } from '@/components/dashboard/DraggableWidget';
 import { useDashboardLayout } from '@/hooks/useDashboardLayout';
+import { useRealtimeDashboard } from '@/hooks/useRealtimeDashboard';
 import issaCareLogo from '@/assets/issa-care-logo.jpg';
 import { format } from 'date-fns';
 import {
@@ -45,6 +47,9 @@ export default function Dashboard() {
     resetLayout, 
     toggleEditMode 
   } = useDashboardLayout();
+  
+  // Enable realtime updates for dashboard data
+  useRealtimeDashboard();
   
   const [activeId, setActiveId] = useState<string | null>(null);
   
@@ -146,6 +151,8 @@ export default function Dashboard() {
   // Widget renderer
   const renderWidget = (widgetId: string) => {
     switch (widgetId) {
+      case 'quick-actions':
+        return <QuickActionsWidget />;
       case 'ai-insights':
         return <AIInsightsPanel />;
       case 'risk-alerts':
