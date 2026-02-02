@@ -18,6 +18,7 @@ import Settings from "./pages/Settings";
 import QOFReports from "./pages/QOFReports";
 import MediTask from "./pages/MediTask";
 import AIAnalytics from "./pages/AIAnalytics";
+import AITasks from "./pages/AITasks";
 import ClinicalVerification from "./pages/ClinicalVerification";
 import CaldicottDashboard from "./pages/CaldicottDashboard";
 import UserManagement from "./pages/UserManagement";
@@ -47,6 +48,7 @@ const App = () => (
               <Route path="/meditask" element={<MediTask />} />
               <Route path="/clinical-verification" element={<ClinicalVerification />} />
               <Route path="/ai-analytics" element={<AIAnalytics />} />
+              <Route path="/ai-tasks" element={<AITasks />} />
               <Route path="/export" element={<Export />} />
               <Route path="/qof-reports" element={<QOFReports />} />
               <Route path="/user-management" element={<UserManagement />} />
