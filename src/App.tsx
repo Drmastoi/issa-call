@@ -40,68 +40,17 @@ const App = () => (
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
             <Route element={<AppLayout />}>
-              {/* Dashboard - accessible to all authenticated users */}
               <Route path="/dashboard" element={<Dashboard />} />
-              
-              {/* Calls features - Nurse, Care Home Doctor, GP, Admin, Caldicott */}
-              <Route path="/calls" element={
-                <RoleGuard allowedRoles={['nurse', 'care_home_doctor', 'gp', 'admin', 'caldicott_guardian']}>
-                  <Calls />
-                </RoleGuard>
-              } />
-              <Route path="/batches" element={
-                <RoleGuard allowedRoles={['nurse', 'care_home_doctor', 'gp', 'admin', 'caldicott_guardian']}>
-                  <Batches />
-                </RoleGuard>
-              } />
-              
-              {/* Care Home Management - Care Home Doctor, GP, Admin, Caldicott */}
-              <Route path="/patients" element={
-                <RoleGuard allowedRoles={['care_home_doctor', 'gp', 'admin', 'caldicott_guardian']}>
-                  <Patients />
-                </RoleGuard>
-              } />
-              <Route path="/meditask" element={
-                <RoleGuard allowedRoles={['care_home_doctor', 'gp', 'admin', 'caldicott_guardian']}>
-                  <MediTask />
-                </RoleGuard>
-              } />
-              <Route path="/clinical-verification" element={
-                <RoleGuard allowedRoles={['care_home_doctor', 'gp', 'admin', 'caldicott_guardian']}>
-                  <ClinicalVerification />
-                </RoleGuard>
-              } />
-              
-              {/* Admin only features */}
-              <Route path="/ai-analytics" element={
-                <RoleGuard allowedRoles={['admin', 'caldicott_guardian']}>
-                  <AIAnalytics />
-                </RoleGuard>
-              } />
-              <Route path="/export" element={
-                <RoleGuard allowedRoles={['admin', 'caldicott_guardian']}>
-                  <Export />
-                </RoleGuard>
-              } />
-              <Route path="/qof-reports" element={
-                <RoleGuard allowedRoles={['admin', 'caldicott_guardian']}>
-                  <QOFReports />
-                </RoleGuard>
-              } />
-              <Route path="/user-management" element={
-                <RoleGuard allowedRoles={['admin', 'caldicott_guardian']}>
-                  <UserManagement />
-                </RoleGuard>
-              } />
-              
-              {/* Caldicott Guardian only */}
-              <Route path="/caldicott" element={
-                <RoleGuard allowedRoles={['caldicott_guardian']}>
-                  <CaldicottDashboard />
-                </RoleGuard>
-              } />
-              
-              {/* Profile - accessible to all */}
+              <Route path="/calls" element={<Calls />} />
+              <Route path="/batches" element={<Batches />} />
+              <Route path="/patients" element={<Patients />} />
+              <Route path="/meditask" element={<MediTask />} />
+              <Route path="/clinical-verification" element={<ClinicalVerification />} />
+              <Route path="/ai-analytics" element={<AIAnalytics />} />
+              <Route path="/export" element={<Export />} />
+              <Route path="/qof-reports" element={<QOFReports />} />
+              <Route path="/user-management" element={<UserManagement />} />
+              <Route path="/caldicott" element={<CaldicottDashboard />} />
               <Route path="/profile" element={<Settings />} />
             </Route>
             <Route path="*" element={<NotFound />} />
