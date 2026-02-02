@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Calendar, Phone, FileDown, LogOut, ChevronLeft, ChevronRight, ClipboardList, Brain, User, ShieldCheck, Shield, UsersRound } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Phone, FileDown, LogOut, ChevronLeft, ChevronRight, ClipboardList, Brain, User, ShieldCheck, Shield, UsersRound, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -14,6 +14,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
   { icon: Brain, label: 'AI Analytics', href: '/ai-analytics' },
+  { icon: Sparkles, label: 'AI Tasks', href: '/ai-tasks' },
   { icon: Users, label: 'Patient List', href: '/patients' },
   { icon: Calendar, label: 'Batch Calls', href: '/batches' },
   { icon: Phone, label: 'Calls History', href: '/calls' },
