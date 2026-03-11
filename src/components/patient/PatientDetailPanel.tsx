@@ -494,25 +494,8 @@ export function PatientDetailPanel({ patientId, isOpen, onClose }: PatientDetail
                   </DialogContent>
                 </Dialog>
 
-                {/* AI Extracted Summary */}
-                {patient.ai_extracted_summary && (
-                  <Card className="border-primary/20 bg-primary/5">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm flex items-center gap-2">
-                        <Sparkles className="h-4 w-4 text-primary" />
-                        AI-Extracted Summary
-                        {patient.ai_extracted_at && (
-                          <Badge variant="outline" className="ml-auto text-xs">
-                            Extracted {formatDate(patient.ai_extracted_at)}
-                          </Badge>
-                        )}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm">{patient.ai_extracted_summary}</p>
-                    </CardContent>
-                  </Card>
-                )}
+                {/* Clinical Summary */}
+                <ClinicalSummaryCard patient={patient} patientId={patientId} />
 
                 {/* Key Status Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
