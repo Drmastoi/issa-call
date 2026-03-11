@@ -631,15 +631,26 @@ export default function AIAnalytics() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={exportFullReport} className="gap-2 hover:shadow-md transition-all">
+            <Button variant="outline" size="sm" onClick={() => {
+              queryClient.invalidateQueries({ queryKey: ['analytics-patients'] });
+              queryClient.invalidateQueries({ queryKey: ['analytics-ai-summaries'] });
+              queryClient.invalidateQueries({ queryKey: ['analytics-pending-tasks'] });
+              queryClient.invalidateQueries({ queryKey: ['analytics-call-responses'] });
+              queryClient.invalidateQueries({ queryKey: ['analytics-health-alerts'] });
+              toast.success('Refreshing data...');
+            }} className="gap-2 hover:shadow-md transition-all" aria-label="Refresh data">
+              <RefreshCw className="h-4 w-4" />
+              Refresh
+            </Button>
+            <Button variant="outline" size="sm" onClick={exportFullReport} className="gap-2 hover:shadow-md transition-all" aria-label="Export summary">
               <Download className="h-4 w-4" />
               Summary
             </Button>
-            <Button variant="outline" size="sm" onClick={exportQOFProgress} className="gap-2 hover:shadow-md transition-all">
+            <Button variant="outline" size="sm" onClick={exportQOFProgress} className="gap-2 hover:shadow-md transition-all" aria-label="Export full report">
               <Download className="h-4 w-4" />
               Full Report
             </Button>
-            <Button variant="outline" size="sm" onClick={exportQOFGaps} className="gap-2 hover:shadow-md transition-all">
+            <Button variant="outline" size="sm" onClick={exportQOFGaps} className="gap-2 hover:shadow-md transition-all" aria-label="Export gaps list">
               <Download className="h-4 w-4" />
               Gaps List
             </Button>
