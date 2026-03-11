@@ -183,10 +183,27 @@ serve(async (req) => {
       },
     });
 
+    // Auto-trigger clinical actions after extraction
+    try {
+      const functionsUrl = `${supabaseUrl}/functions/v1/clinical-actions`;
+      await fetch(functionsUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseKey}`,
+        },
+        body: JSON.stringify({ patientId }),
+      });
+      console.log("Clinical actions triggered for patient:", patientId);
+    } catch (triggerErr) {
+      console.error("Clinical actions trigger failed (non-blocking):", triggerErr);
+    }
+
     return new Response(JSON.stringify({
       success: true,
       extractedData: { ...piiData, ...clinicalData },
       gdprCompliant: true,
+      clinicalActionsTriggered: true,
     }), { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
 
   } catch (error) {
