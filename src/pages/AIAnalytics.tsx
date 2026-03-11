@@ -66,6 +66,7 @@ const getCategoryIcon = (iconName: string) => {
 };
 
 export default function AIAnalytics() {
+  const queryClient = useQueryClient();
   const [gapFilter, setGapFilter] = useState<GapFilter>('all');
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
