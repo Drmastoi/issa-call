@@ -547,93 +547,115 @@ Jane Doe,07700900456,,Afternoon`}
           {isLoading ? (
             <div className="text-center py-8 text-muted-foreground">Loading...</div>
           ) : patients && patients.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Phone Number</TableHead>
-                  <TableHead>NHS Number</TableHead>
-                  <TableHead>Preferred Time</TableHead>
-                  <TableHead>Added</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {patients.map((patient) => (
-                  <TableRow key={patient.id}>
-                    <TableCell className="font-medium">
-                      {patient.name && patient.name.length < 60 && !patient.name.includes('  ') && !/\b(review from|allocated|assessment|preference|oedema|telephone|consent|having|likely|Template|Medication Monitoring)\b/i.test(patient.name)
-                        ? patient.name
-                        : (
-                          <span className="flex items-center gap-2">
-                            <User className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-muted-foreground">
-                              {patient.nhs_number ? `NHS: ${patient.nhs_number}` : `ID: ${patient.id.substring(0, 8).toUpperCase()}`}
-                            </span>
-                            <span className="text-xs text-destructive">(name not extracted)</span>
-                          </span>
-                        )
-                      }
-                    </TableCell>
-                    <TableCell>{patient.phone_number}</TableCell>
-                    <TableCell>{patient.nhs_number || '-'}</TableCell>
-                    <TableCell>{patient.preferred_call_time || '-'}</TableCell>
-                    <TableCell>
-                      {new Date(patient.created_at).toLocaleDateString('en-GB')}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setDetailPatientId(patient.id)}
-                          title="View patient details"
-                        >
-                          <User className="h-4 w-4 text-blue-600" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setMetricsPatient(patient)}
-                          title="View health metrics"
-                        >
-                          <Activity className="h-4 w-4 text-green-600" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => testCallMutation.mutate(patient)}
-                          disabled={callingPatientId === patient.id}
-                          title="Test call"
-                        >
-                          {callingPatientId === patient.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Phone className="h-4 w-4 text-primary" />
-                          )}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setEditingPatient(patient)}
-                          title="Edit patient"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => deletePatientMutation.mutate(patient.id)}
-                          title="Delete patient"
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={allOnPageSelected}
+                        onCheckedChange={toggleSelectAll}
+                        aria-label="Select all on page"
+                      />
+                    </TableHead>
+                    <TableHead>
+                      <button onClick={() => toggleSort('name')} className="flex items-center gap-1 hover:text-foreground transition-colors">
+                        Name <ArrowUpDown className="h-3 w-3" />
+                      </button>
+                    </TableHead>
+                    <TableHead>Phone Number</TableHead>
+                    <TableHead>
+                      <button onClick={() => toggleSort('nhs_number')} className="flex items-center gap-1 hover:text-foreground transition-colors">
+                        NHS Number <ArrowUpDown className="h-3 w-3" />
+                      </button>
+                    </TableHead>
+                    <TableHead>Preferred Time</TableHead>
+                    <TableHead>
+                      <button onClick={() => toggleSort('created_at')} className="flex items-center gap-1 hover:text-foreground transition-colors">
+                        Added <ArrowUpDown className="h-3 w-3" />
+                      </button>
+                    </TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {paginatedPatients.map((patient) => (
+                    <TableRow key={patient.id} data-state={selectedIds.has(patient.id) ? 'selected' : undefined}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.has(patient.id)}
+                          onCheckedChange={() => toggleSelect(patient.id)}
+                          aria-label={`Select ${patient.name}`}
+                        />
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {patient.name && patient.name.length < 60 && !patient.name.includes('  ') && !/\b(review from|allocated|assessment|preference|oedema|telephone|consent|having|likely|Template|Medication Monitoring)\b/i.test(patient.name)
+                          ? patient.name
+                          : (
+                            <span className="flex items-center gap-2">
+                              <User className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-muted-foreground">
+                                {patient.nhs_number ? `NHS: ${patient.nhs_number}` : `ID: ${patient.id.substring(0, 8).toUpperCase()}`}
+                              </span>
+                              <span className="text-xs text-destructive">(name not extracted)</span>
+                            </span>
+                          )
+                        }
+                      </TableCell>
+                      <TableCell>{patient.phone_number}</TableCell>
+                      <TableCell>{patient.nhs_number || '-'}</TableCell>
+                      <TableCell>{patient.preferred_call_time || '-'}</TableCell>
+                      <TableCell>
+                        {new Date(patient.created_at).toLocaleDateString('en-GB')}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => setDetailPatientId(patient.id)} aria-label="View patient details">
+                            <User className="h-4 w-4 text-primary" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => setMetricsPatient(patient)} aria-label="View health metrics">
+                            <Activity className="h-4 w-4 text-accent" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => testCallMutation.mutate(patient)} disabled={callingPatientId === patient.id} aria-label="Test call">
+                            {callingPatientId === patient.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Phone className="h-4 w-4 text-primary" />
+                            )}
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => setEditingPatient(patient)} aria-label="Edit patient">
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => deletePatientMutation.mutate(patient.id)} aria-label="Delete patient">
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between pt-4 border-t mt-4">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {page * pageSize + 1}–{Math.min((page + 1) * pageSize, totalPatients)} of {totalPatients}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(p => p - 1)} aria-label="Previous page">
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm font-medium">
+                      {page + 1} / {totalPages}
+                    </span>
+                    <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)} aria-label="Next page">
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               No patients found. Add your first patient or upload a CSV file.
