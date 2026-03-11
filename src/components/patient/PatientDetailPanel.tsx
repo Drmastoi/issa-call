@@ -15,7 +15,8 @@ import {
   User, Heart, Activity, Cigarette, Wine, Scale, Ruler, 
   Calendar, AlertTriangle, CheckCircle, XCircle, Brain,
   HeartPulse, Wind, Pill, FileText, Phone, Clock, Shield,
-  UserCheck, Stethoscope, Home, Accessibility, Apple, MessageSquare, Sparkles, Loader2, RefreshCw
+  UserCheck, Stethoscope, Home, Accessibility, Apple, MessageSquare, Sparkles, Loader2, RefreshCw,
+  Copy, Printer
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
