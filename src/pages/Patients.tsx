@@ -39,6 +39,7 @@ export default function Patients() {
   const [activeCallPatientName, setActiveCallPatientName] = useState<string | undefined>(undefined);
   const [metricsPatient, setMetricsPatient] = useState<Patient | null>(null);
   const [detailPatientId, setDetailPatientId] = useState<string | null>(null);
+  const [bulkSummaryProgress, setBulkSummaryProgress] = useState<{ current: number; total: number } | null>(null);
   const { user } = useAuth();
   const { logAction } = useAuditLog();
   const { toast } = useToast();
