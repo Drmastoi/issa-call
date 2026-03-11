@@ -165,6 +165,8 @@ export default function Dashboard() {
         return <QOFProgressPanel />;
       case 'meditask':
         return <MediTaskWidget />;
+      case 'clinical-safety':
+        return <ClinicalSafetyWidget />;
       case 'recent-calls':
         return (
           <Card className="h-full shadow-sm hover:shadow-md transition-shadow">
