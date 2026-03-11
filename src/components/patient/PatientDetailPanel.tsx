@@ -15,7 +15,8 @@ import {
   User, Heart, Activity, Cigarette, Wine, Scale, Ruler, 
   Calendar, AlertTriangle, CheckCircle, XCircle, Brain,
   HeartPulse, Wind, Pill, FileText, Phone, Clock, Shield,
-  UserCheck, Stethoscope, Home, Accessibility, Apple, MessageSquare, Sparkles, Loader2, RefreshCw
+  UserCheck, Stethoscope, Home, Accessibility, Apple, MessageSquare, Sparkles, Loader2, RefreshCw,
+  Copy, Printer
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -118,6 +119,55 @@ function ClinicalSummaryCard({ patient, patientId }: { patient: PatientData; pat
     return new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
+  const copyToClipboard = async () => {
+    if (!patient.ai_extracted_summary) return;
+    const header = `CLINICAL SUMMARY — ${patient.name}${patient.nhs_number ? ` (NHS: ${patient.nhs_number})` : ''}\nGenerated: ${patient.ai_extracted_at ? formatDate(patient.ai_extracted_at) : 'N/A'}\n${'—'.repeat(40)}\n`;
+    const text = header + patient.ai_extracted_summary;
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: 'Copied to clipboard', description: 'Summary ready to paste into EHR.' });
+    } catch {
+      // Fallback for older browsers
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      toast({ title: 'Copied to clipboard' });
+    }
+  };
+
+  const printSummary = () => {
+    if (!patient.ai_extracted_summary) return;
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    if (!printWindow) return;
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html><head><title>Clinical Summary — ${patient.name}</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 40px; max-width: 700px; margin: 0 auto; color: #111; }
+        h1 { font-size: 16px; margin-bottom: 4px; }
+        .meta { font-size: 12px; color: #666; margin-bottom: 16px; border-bottom: 1px solid #ccc; padding-bottom: 8px; }
+        pre { font-family: Arial, sans-serif; white-space: pre-wrap; font-size: 13px; line-height: 1.6; }
+        .footer { margin-top: 24px; font-size: 10px; color: #999; border-top: 1px solid #eee; padding-top: 8px; }
+        @media print { body { padding: 20px; } }
+      </style></head><body>
+      <h1>Clinical Summary — ${patient.name}</h1>
+      <div class="meta">
+        ${patient.nhs_number ? `NHS Number: ${patient.nhs_number} | ` : ''}
+        ${patient.date_of_birth ? `DOB: ${formatDate(patient.date_of_birth)} | ` : ''}
+        Generated: ${patient.ai_extracted_at ? formatDate(patient.ai_extracted_at) : 'N/A'}
+      </div>
+      <pre>${patient.ai_extracted_summary}</pre>
+      <div class="footer">Printed ${new Date().toLocaleString('en-GB')} — ISSA Care Clinical Summary</div>
+      </body></html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  };
+
   return (
     <Card className="border-primary/20 bg-primary/5">
       <CardHeader className="pb-2">
@@ -129,19 +179,30 @@ function ClinicalSummaryCard({ patient, patientId }: { patient: PatientData; pat
               {formatDate(patient.ai_extracted_at)}
             </Badge>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={generateSummary}
-            disabled={generating}
-            className="ml-2"
-          >
-            {generating ? (
-              <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Generating...</>
-            ) : (
-              <><RefreshCw className="h-3 w-3 mr-1" />{patient.ai_extracted_summary ? 'Refresh' : 'Generate'}</>
+          <div className="flex gap-1 ml-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={generateSummary}
+              disabled={generating}
+            >
+              {generating ? (
+                <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Generating...</>
+              ) : (
+                <><RefreshCw className="h-3 w-3 mr-1" />{patient.ai_extracted_summary ? 'Refresh' : 'Generate'}</>
+              )}
+            </Button>
+            {patient.ai_extracted_summary && (
+              <>
+                <Button variant="outline" size="sm" onClick={copyToClipboard} title="Copy to clipboard for EHR">
+                  <Copy className="h-3 w-3 mr-1" />Copy
+                </Button>
+                <Button variant="outline" size="sm" onClick={printSummary} title="Print summary">
+                  <Printer className="h-3 w-3 mr-1" />Print
+                </Button>
+              </>
             )}
-          </Button>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent>
