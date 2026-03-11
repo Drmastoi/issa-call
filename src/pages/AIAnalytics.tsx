@@ -1131,15 +1131,59 @@ export default function AIAnalytics() {
 
           <TabsContent value="actions" className="mt-6">
             <Card className="shadow-sm">
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Target className="h-12 w-12 text-primary/50 mb-4" />
-                <h3 className="text-lg font-semibold mb-2">QOF Actions Moved to AI Tasks</h3>
-                <p className="text-muted-foreground text-center mb-4">
-                  Clinical QOF actions are now integrated with AI Task Management for a unified workflow.
-                </p>
-                <Button asChild>
-                  <Link to="/ai-tasks">Go to AI Tasks</Link>
-                </Button>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-warning/10 rounded-lg">
+                      <ListChecks className="h-5 w-5 text-warning" />
+                    </div>
+                    <div>
+                      <CardTitle>Top Clinical Actions</CardTitle>
+                      <CardDescription>High-priority tasks requiring attention</CardDescription>
+                    </div>
+                  </div>
+                  <Button asChild variant="outline" size="sm">
+                    <Link to="/ai-tasks">View All Tasks <ArrowRight className="ml-2 h-4 w-4" /></Link>
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {pendingTasks.filter(t => t.priority === 'high').length > 0 ? (
+                  <div className="space-y-2">
+                    {pendingTasks.filter(t => t.priority === 'high').slice(0, 5).map((task: any) => (
+                      <div key={task.id} className="p-3 rounded-lg border hover:bg-muted/50 transition-colors">
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="font-medium text-sm line-clamp-1">{task.title}</span>
+                          <Badge variant="destructive" className="shrink-0 text-xs">
+                            {task.priority}
+                          </Badge>
+                        </div>
+                        {task.description && (
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{task.description}</p>
+                        )}
+                        <div className="flex items-center gap-3 mt-2">
+                          {task.patients && (
+                            <span className="flex items-center gap-1 text-xs text-primary">
+                              <User className="h-3 w-3" />
+                              {task.patients.name}
+                            </span>
+                          )}
+                          {task.due_date && (
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Clock className="h-3 w-3" />
+                              {new Date(task.due_date).toLocaleDateString('en-GB')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                    <CheckCircle2 className="h-10 w-10 mb-2 opacity-50" />
+                    <p className="text-sm">No high-priority actions pending</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
