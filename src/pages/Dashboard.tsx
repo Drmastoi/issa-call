@@ -338,104 +338,83 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Stats Grid - Enhanced with gradients and trends */}
+      {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="relative overflow-hidden border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 animate-fade-in" style={{ animationDelay: '50ms' }}>
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent" />
-          <CardHeader className="flex flex-row items-center justify-between pb-2 relative">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Patients</CardTitle>
-            <div className="p-2 rounded-lg bg-primary/10">
-              <Users className="h-4 w-4 text-primary" />
-            </div>
-          </CardHeader>
-          <CardContent className="relative">
-            <div className="text-3xl font-bold">{stats?.totalPatients ?? 0}</div>
-            <div className="flex items-center justify-between mt-2">
+        <KPICard
+          title="Total Patients"
+          value={stats?.totalPatients ?? 0}
+          icon={Users}
+          iconColor="text-primary"
+          gradientFrom="from-primary/10 via-primary/5"
+          loading={statsLoading}
+          delay={50}
+          footer={
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-1 text-xs text-success">
                 <TrendingUp className="h-3 w-3" />
                 <span>Active cohort</span>
               </div>
-              <Link to="/patients" className="text-xs text-primary hover:underline">
-                View all →
-              </Link>
+              <Link to="/patients" className="text-xs text-primary hover:underline">View all →</Link>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="relative overflow-hidden border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 animate-fade-in" style={{ animationDelay: '100ms' }}>
-          <div className="absolute inset-0 bg-gradient-to-br from-warning/10 via-warning/5 to-transparent" />
-          <CardHeader className="flex flex-row items-center justify-between pb-2 relative">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Pending Batches</CardTitle>
-            <div className="p-2 rounded-lg bg-warning/10">
-              <Calendar className="h-4 w-4 text-warning" />
-            </div>
-          </CardHeader>
-          <CardContent className="relative">
-            <div className="text-3xl font-bold">{stats?.pendingBatches ?? 0}</div>
-            <div className="flex items-center justify-between mt-2">
+          }
+        />
+        <KPICard
+          title="Pending Batches"
+          value={stats?.pendingBatches ?? 0}
+          icon={Calendar}
+          iconColor="text-warning"
+          gradientFrom="from-warning/10 via-warning/5"
+          loading={statsLoading}
+          delay={100}
+          footer={
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Clock className="h-3 w-3" />
                 <span>Awaiting processing</span>
               </div>
-              <Link to="/batches" className="text-xs text-primary hover:underline">
-                Manage →
-              </Link>
+              <Link to="/batches" className="text-xs text-primary hover:underline">Manage →</Link>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="relative overflow-hidden border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 animate-fade-in" style={{ animationDelay: '150ms' }}>
-          <div className="absolute inset-0 bg-gradient-to-br from-accent/10 via-accent/5 to-transparent" />
-          <CardHeader className="flex flex-row items-center justify-between pb-2 relative">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Calls</CardTitle>
-            <div className="p-2 rounded-lg bg-accent/10">
-              <Phone className="h-4 w-4 text-accent" />
-            </div>
-          </CardHeader>
-          <CardContent className="relative">
-            <div className="text-3xl font-bold">{stats?.totalCalls ?? 0}</div>
-            <div className="flex items-center justify-between mt-2">
+          }
+        />
+        <KPICard
+          title="Total Calls"
+          value={stats?.totalCalls ?? 0}
+          icon={Phone}
+          iconColor="text-accent"
+          gradientFrom="from-accent/10 via-accent/5"
+          loading={statsLoading}
+          delay={150}
+          footer={
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Sparkles className="h-3 w-3" />
                 <span>All time</span>
               </div>
-              <Link to="/calls" className="text-xs text-primary hover:underline">
-                History →
-              </Link>
+              <Link to="/calls" className="text-xs text-primary hover:underline">History →</Link>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="relative overflow-hidden border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 animate-fade-in" style={{ animationDelay: '200ms' }}>
-          <div className="absolute inset-0 bg-gradient-to-br from-success/10 via-success/5 to-transparent" />
-          <CardHeader className="flex flex-row items-center justify-between pb-2 relative">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Success Rate</CardTitle>
-            <div className="p-2 rounded-lg bg-success/10">
-              <CheckCircle className="h-4 w-4 text-success" />
-            </div>
-          </CardHeader>
-          <CardContent className="relative">
-            <div className="text-3xl font-bold">{successRate}%</div>
-            <div className="flex items-center justify-between mt-2">
+          }
+        />
+        <KPICard
+          title="Success Rate"
+          value={`${successRate}%`}
+          icon={CheckCircle}
+          iconColor="text-success"
+          gradientFrom="from-success/10 via-success/5"
+          loading={statsLoading}
+          delay={200}
+          footer={
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-1 text-xs text-success">
                 {successRate >= 80 ? (
-                  <>
-                    <TrendingUp className="h-3 w-3" />
-                    <span>Above target</span>
-                  </>
+                  <><TrendingUp className="h-3 w-3" /><span>Above target</span></>
                 ) : (
-                  <>
-                    <TrendingDown className="h-3 w-3 text-warning" />
-                    <span className="text-warning">Below target</span>
-                  </>
+                  <><TrendingDown className="h-3 w-3 text-warning" /><span className="text-warning">Below target</span></>
                 )}
               </div>
-              <span className="text-xs text-muted-foreground">
-                {stats?.completedCalls ?? 0} completed
-              </span>
+              <span className="text-xs text-muted-foreground">{stats?.completedCalls ?? 0} completed</span>
             </div>
-          </CardContent>
-        </Card>
+          }
+        />
       </div>
 
       {/* Draggable Widget Grid */}
