@@ -76,6 +76,10 @@ export default function Patients() {
       logAction('create', 'patient', data.id, { name: data.name });
       toast({ title: 'Patient added successfully' });
       setAddDialogOpen(false);
+      // Auto-generate clinical summary
+      supabase.functions.invoke('generate-patient-summary', {
+        body: { patientId: data.id }
+      }).catch(err => console.warn('Summary generation deferred:', err));
     },
     onError: (error: Error) => {
       toast({ variant: 'destructive', title: 'Failed to add patient', description: error.message });
@@ -185,6 +189,12 @@ export default function Patients() {
       logAction('batch_upload', 'patient', undefined, { count: data.length });
       toast({ title: `${data.length} patients uploaded successfully` });
       setUploadDialogOpen(false);
+      // Auto-generate summaries for all uploaded patients
+      data.forEach((p: any) => {
+        supabase.functions.invoke('generate-patient-summary', {
+          body: { patientId: p.id }
+        }).catch(err => console.warn('Summary generation deferred:', err));
+      });
     },
     onError: (error: Error) => {
       toast({ variant: 'destructive', title: 'Failed to upload patients', description: error.message });

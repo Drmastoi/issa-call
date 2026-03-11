@@ -93,6 +93,70 @@ interface Call {
   transcript: string | null;
 }
 
+function ClinicalSummaryCard({ patient, patientId }: { patient: PatientData; patientId: string }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [generating, setGenerating] = useState(false);
+
+  const generateSummary = async () => {
+    setGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-patient-summary', {
+        body: { patientId }
+      });
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['patient-detail', patientId] });
+      toast({ title: 'Clinical summary generated' });
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Failed to generate summary', description: err.message });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
+  return (
+    <Card className="border-primary/20 bg-primary/5">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <FileText className="h-4 w-4 text-primary" />
+          Clinical Summary
+          {patient.ai_extracted_at && (
+            <Badge variant="outline" className="ml-auto text-xs">
+              {formatDate(patient.ai_extracted_at)}
+            </Badge>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={generateSummary}
+            disabled={generating}
+            className="ml-2"
+          >
+            {generating ? (
+              <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Generating...</>
+            ) : (
+              <><RefreshCw className="h-3 w-3 mr-1" />{patient.ai_extracted_summary ? 'Refresh' : 'Generate'}</>
+            )}
+          </Button>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {patient.ai_extracted_summary ? (
+          <pre className="text-sm whitespace-pre-wrap font-sans leading-relaxed">{patient.ai_extracted_summary}</pre>
+        ) : (
+          <p className="text-sm text-muted-foreground italic">
+            No clinical summary yet. Click "Generate" to create one from patient data.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function PatientDetailPanel({ patientId, isOpen, onClose }: PatientDetailPanelProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -494,25 +558,8 @@ export function PatientDetailPanel({ patientId, isOpen, onClose }: PatientDetail
                   </DialogContent>
                 </Dialog>
 
-                {/* AI Extracted Summary */}
-                {patient.ai_extracted_summary && (
-                  <Card className="border-primary/20 bg-primary/5">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm flex items-center gap-2">
-                        <Sparkles className="h-4 w-4 text-primary" />
-                        AI-Extracted Summary
-                        {patient.ai_extracted_at && (
-                          <Badge variant="outline" className="ml-auto text-xs">
-                            Extracted {formatDate(patient.ai_extracted_at)}
-                          </Badge>
-                        )}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm">{patient.ai_extracted_summary}</p>
-                    </CardContent>
-                  </Card>
-                )}
+                {/* Clinical Summary */}
+                <ClinicalSummaryCard patient={patient} patientId={patientId} />
 
                 {/* Key Status Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
