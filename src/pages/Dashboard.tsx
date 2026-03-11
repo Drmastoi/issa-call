@@ -20,6 +20,7 @@ import { useDashboardLayout } from '@/hooks/useDashboardLayout';
 import { useRealtimeDashboard } from '@/hooks/useRealtimeDashboard';
 import issaCareLogo from '@/assets/issa-care-logo.jpg';
 import { format } from 'date-fns';
+import { KPICard } from '@/components/dashboard/KPICard';
 import {
   DndContext,
   closestCenter,
