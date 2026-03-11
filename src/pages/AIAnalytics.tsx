@@ -45,7 +45,6 @@ import { KPICard } from '@/components/dashboard/KPICard';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area, BarChart, Bar, Legend } from 'recharts';
 
 type GapFilter = 'all' | 'bp' | 'smoking' | 'no-data';
-type PriorityFilter = 'all' | 'high' | 'medium' | 'normal';
 
 const getCategoryIcon = (iconName: string) => {
   switch (iconName) {
