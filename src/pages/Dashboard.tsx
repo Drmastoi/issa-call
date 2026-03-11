@@ -12,6 +12,7 @@ import { AIInsightsPanel } from '@/components/dashboard/AIInsightsPanel';
 import { RiskAlertsWidget } from '@/components/dashboard/RiskAlertsWidget';
 import { QOFProgressPanel } from '@/components/dashboard/QOFProgressPanel';
 import { MediTaskWidget } from '@/components/dashboard/MediTaskWidget';
+import { ClinicalSafetyWidget } from '@/components/dashboard/ClinicalSafetyWidget';
 import { QuickActionsWidget } from '@/components/dashboard/QuickActionsWidget';
 import { TodaysPriorities } from '@/components/dashboard/TodaysPriorities';
 import { DraggableWidget } from '@/components/dashboard/DraggableWidget';
@@ -164,6 +165,8 @@ export default function Dashboard() {
         return <QOFProgressPanel />;
       case 'meditask':
         return <MediTaskWidget />;
+      case 'clinical-safety':
+        return <ClinicalSafetyWidget />;
       case 'recent-calls':
         return (
           <Card className="h-full shadow-sm hover:shadow-md transition-shadow">

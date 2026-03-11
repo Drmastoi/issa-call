@@ -1,206 +1,68 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
-// GDPR-COMPLIANT: Two-stage extraction
-// Stage 1: Extract PII locally using regex (no AI)
-// Stage 2: Extract clinical data using AI (no PII sent)
-
-// Stage 1: Local PII extraction using regex patterns
-function extractPIILocally(text: string): {
-  name: string | null;
-  phone_number: string | null;
-  nhs_number: string | null;
-  date_of_birth: string | null;
-} {
-  // Extract NHS number (10 digits, may have spaces)
-  const nhsMatch = text.match(/NHS\s*(?:Number|No\.?)?\s*:?\s*(\d{3}\s?\d{3}\s?\d{4})/i) ||
-                   text.match(/(\d{3}\s?\d{3}\s?\d{4})/);
-  const nhsNumber = nhsMatch ? nhsMatch[1].replace(/\s/g, '') : null;
-
-  // Extract phone number (UK formats)
-  const phoneMatch = text.match(/(?:Tel|Phone|Mobile|Contact)?\s*:?\s*(\+44\s?\d{4}\s?\d{6}|\+44\s?\d{3}\s?\d{3}\s?\d{4}|0\d{4}\s?\d{6}|0\d{3}\s?\d{3}\s?\d{4}|07\d{3}\s?\d{6})/i);
-  let phoneNumber = phoneMatch ? phoneMatch[1].replace(/\s/g, '') : null;
-  
-  // Convert to international format
-  if (phoneNumber && phoneNumber.startsWith('0')) {
-    phoneNumber = '+44' + phoneNumber.substring(1);
-  }
-
-  // Extract date of birth (various formats)
-  const dobMatch = text.match(/(?:DOB|Date of Birth|D\.O\.B\.?|Born)\s*:?\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i) ||
-                   text.match(/(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4})/);
-  let dateOfBirth: string | null = null;
-  
-  if (dobMatch) {
-    const parts = dobMatch[1].split(/[\/\-\.]/);
-    if (parts.length === 3) {
-      let day = parts[0].padStart(2, '0');
-      let month = parts[1].padStart(2, '0');
-      let year = parts[2];
-      
-      // Handle 2-digit year
-      if (year.length === 2) {
-        year = parseInt(year) > 30 ? '19' + year : '20' + year;
-      }
-      
-      // Assume DD/MM/YYYY format (UK)
-      dateOfBirth = `${year}-${month}-${day}`;
-    }
-  }
-
-  // Extract patient name - look for structured patterns first, then title-based
-  const namePatterns = [
-    // "Patient Name: John Smith" or "Patient: John Smith"
-    /(?:Patient\s*(?:Name)?)\s*:?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})/i,
-    // "Name: John Smith"
-    /(?:^|\n)\s*Name\s*:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})/im,
-    // "Mr/Mrs/Dr John Smith" at start of line or after common delimiters
-    /(?:^|\n)\s*(?:Mr|Mrs|Ms|Miss|Dr|Prof)\.?\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})/im,
-    // "Surname: Smith" + "Forename: John" pattern
-    /(?:Surname|Last\s*Name)\s*:\s*([A-Z][a-z]+)/i,
-  ];
-  
-  let name: string | null = null;
-  for (const pattern of namePatterns) {
-    const match = text.match(pattern);
-    if (match) {
-      const candidate = match[1].trim();
-      // Validate: real names are typically 2-4 words, each capitalized, no medical terms
-      const medicalTerms = /\b(review|assessment|allocated|consent|telephone|medication|monitoring|template|oedema|preference|having|likely|care|home|residence|register|steroid|dementia|specialist|end of life)\b/i;
-      if (!medicalTerms.test(candidate) && candidate.length >= 3 && candidate.length <= 50) {
-        name = candidate;
-        break;
-      }
-    }
-  }
-  
-  // Also try to find forename + surname separately
-  if (!name) {
-    const forenameMatch = text.match(/(?:Forename|First\s*Name|Given\s*Name)\s*:\s*([A-Z][a-z]+)/i);
-    const surnameMatch = text.match(/(?:Surname|Last\s*Name|Family\s*Name)\s*:\s*([A-Z][a-z]+)/i);
-    if (forenameMatch && surnameMatch) {
-      name = `${forenameMatch[1].trim()} ${surnameMatch[1].trim()}`;
-    }
-  }
-
-  return {
-    name,
-    phone_number: phoneNumber,
-    nhs_number: nhsNumber,
-    date_of_birth: dateOfBirth
-  };
-}
-
-// Stage 2: Remove PII from text before sending to AI
-function sanitizeTextForAI(text: string): string {
-  let sanitized = text;
-  
-  // Remove NHS numbers
-  sanitized = sanitized.replace(/\d{3}\s?\d{3}\s?\d{4}/g, '[NHS_NUMBER]');
-  
-  // Remove phone numbers
-  sanitized = sanitized.replace(/(\+44|0)\s?\d{3,4}\s?\d{3}\s?\d{3,4}/g, '[PHONE]');
-  
-  // Remove dates of birth patterns
-  sanitized = sanitized.replace(/(?:DOB|Date of Birth|D\.O\.B\.?|Born)\s*:?\s*\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/gi, '[DOB]');
-  
-  // Remove full names after common patterns (keep first names for clinical context)
-  sanitized = sanitized.replace(/(?:Patient\s*(?:Name)?|Name)\s*:?\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+/gi, 'Patient: [NAME]');
-  
-  // Remove addresses
-  sanitized = sanitized.replace(/\d+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:Street|Road|Lane|Avenue|Close|Drive|Way|Court|Crescent|Place|Gardens|Terrace|Mews)\s*,?\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s*,?\s*[A-Z]{1,2}\d{1,2}\s?\d[A-Z]{2}/gi, '[ADDRESS]');
-  
-  // Remove postcodes
-  sanitized = sanitized.replace(/[A-Z]{1,2}\d{1,2}\s?\d[A-Z]{2}/gi, '[POSTCODE]');
-  
-  return sanitized;
-}
+import { extractPII, sanitizeForAI, CLINICAL_SYSTEM_PROMPT, CORS_HEADERS } from "../_shared/pii-extraction.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: CORS_HEADERS });
   }
 
   try {
     const { pdfText } = await req.json();
-
     if (!pdfText || typeof pdfText !== "string") {
-      return new Response(
-        JSON.stringify({ error: "PDF text content is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "PDF text content is required" }),
+        { status: 400, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
     }
 
-    console.log("GDPR-Compliant extraction: Processing PDF text, length:", pdfText.length);
+    console.log("GDPR-Compliant PDF extraction, length:", pdfText.length);
 
-    // STAGE 1: Extract PII locally (no AI)
-    console.log("Stage 1: Local PII extraction...");
-    const piiData = extractPIILocally(pdfText);
-    console.log("PII extracted locally:", { 
-      hasName: !!piiData.name, 
-      hasPhone: !!piiData.phone_number,
-      hasNHS: !!piiData.nhs_number,
-      hasDOB: !!piiData.date_of_birth
-    });
+    // STAGE 1: Extract PII locally
+    const piiData = extractPII(pdfText);
+    console.log("PII extracted locally:", { hasName: !!piiData.name, hasPhone: !!piiData.phone_number, hasNHS: !!piiData.nhs_number });
 
-    // STAGE 2: Sanitize text and send to AI for clinical data extraction
+    // STAGE 2: Sanitize and send to AI for clinical + lab data
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    // Remove all PII from text before sending to AI
-    const sanitizedText = sanitizeTextForAI(pdfText);
-    console.log("Stage 2: Sending sanitized text to AI (no PII)...");
+    const sanitizedText = sanitizeForAI(pdfText);
 
-    // AI prompt only asks for clinical data, not PII
-    const prompt = `Extract ONLY clinical data from this medical summary document. DO NOT extract any patient-identifiable information.
-
-Look for CLINICAL DATA ONLY:
-1. Conditions/diagnoses (diabetes, hypertension, COPD, asthma, CHD, AF, stroke, mental health conditions, etc.)
-2. Current smoking status (current smoker, ex-smoker, never smoked, unknown)
-3. Last HbA1c value (mmol/mol) and date if present
-4. Last blood pressure reading (systolic/diastolic) and date if present
-5. Medications list (active medications)
-6. Frailty status if mentioned (mild, moderate, severe)
-7. Alcohol units per week if mentioned
+    const prompt = `Extract ALL clinical data from this medical document. Include conditions, medications, lab values (HbA1c, cholesterol, eGFR, creatinine), vital signs (BP, weight, height), scores (CHA2DS2-VASc, frailty), and smoking/alcohol status.
 
 Document content (anonymized):
 ${sanitizedText.substring(0, 12000)}
 
-Respond ONLY with valid JSON in this exact format (no markdown, no explanation):
+Respond ONLY with valid JSON:
 {
-  "conditions": ["array of condition names"] or [],
+  "conditions": [],
   "smoking_status": "current_smoker|ex_smoker|never_smoked|unknown",
-  "hba1c_mmol_mol": number or null,
-  "hba1c_date": "YYYY-MM-DD or null",
-  "blood_pressure_systolic": number or null,
-  "blood_pressure_diastolic": number or null,
-  "bp_date": "YYYY-MM-DD or null",
-  "medications": ["array of medication names"] or [],
-  "frailty_status": "mild|moderate|severe or null",
-  "alcohol_units_per_week": number or null
-}
-
-If you cannot find a field, use null or empty array.`;
+  "hba1c_mmol_mol": null,
+  "hba1c_date": null,
+  "cholesterol_ldl": null,
+  "cholesterol_hdl": null,
+  "cholesterol_date": null,
+  "blood_pressure_systolic": null,
+  "blood_pressure_diastolic": null,
+  "bp_date": null,
+  "medications": [],
+  "frailty_status": null,
+  "alcohol_units_per_week": null,
+  "weight_kg": null,
+  "height_cm": null,
+  "cha2ds2_vasc_score": null,
+  "egfr": null,
+  "creatinine": null,
+  "last_review_date": null
+}`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
         messages: [
-          {
-            role: "system",
-            content: "You are a clinical data parser. Extract ONLY clinical information (conditions, medications, metrics). NEVER extract or include patient names, NHS numbers, addresses, or any identifiable information."
-          },
+          { role: "system", content: CLINICAL_SYSTEM_PROMPT },
           { role: "user", content: prompt }
         ],
         temperature: 0.1,
@@ -208,66 +70,60 @@ If you cannot find a field, use null or empty array.`;
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Lovable AI error:", errorText);
+      const errText = await response.text();
+      console.error("AI error:", errText);
       throw new Error(`AI extraction failed: ${response.status}`);
     }
 
     const aiResponse = await response.json();
     const content = aiResponse.choices?.[0]?.message?.content;
 
-    console.log("AI response received (clinical data only)");
-
-    // Parse the JSON response
     let clinicalData;
     try {
-      let cleanContent = content.trim();
-      if (cleanContent.startsWith("```json")) {
-        cleanContent = cleanContent.slice(7);
-      } else if (cleanContent.startsWith("```")) {
-        cleanContent = cleanContent.slice(3);
-      }
-      if (cleanContent.endsWith("```")) {
-        cleanContent = cleanContent.slice(0, -3);
-      }
-      clinicalData = JSON.parse(cleanContent.trim());
-    } catch (parseError) {
+      let clean = content.trim();
+      if (clean.startsWith("```json")) clean = clean.slice(7);
+      else if (clean.startsWith("```")) clean = clean.slice(3);
+      if (clean.endsWith("```")) clean = clean.slice(0, -3);
+      clinicalData = JSON.parse(clean.trim());
+    } catch {
       console.error("Failed to parse AI response:", content);
       throw new Error("Failed to parse extracted clinical data");
     }
 
-    // Combine PII (from local extraction) with clinical data (from AI)
-    return new Response(
-      JSON.stringify({
-        success: true,
-        data: {
-          // PII from local extraction (never sent to AI)
-          name: piiData.name,
-          phone_number: piiData.phone_number,
-          nhs_number: piiData.nhs_number,
-          date_of_birth: piiData.date_of_birth,
-          // Clinical data from AI (no PII in AI context)
-          conditions: clinicalData.conditions || [],
-          smoking_status: clinicalData.smoking_status || null,
-          hba1c_mmol_mol: clinicalData.hba1c_mmol_mol || null,
-          hba1c_date: clinicalData.hba1c_date || null,
-          blood_pressure_systolic: clinicalData.blood_pressure_systolic || null,
-          blood_pressure_diastolic: clinicalData.blood_pressure_diastolic || null,
-          bp_date: clinicalData.bp_date || null,
-          medications: clinicalData.medications || [],
-          frailty_status: clinicalData.frailty_status || null,
-          alcohol_units_per_week: clinicalData.alcohol_units_per_week || null,
-        }
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({
+      success: true,
+      data: {
+        // PII from local extraction
+        name: piiData.name,
+        phone_number: piiData.phone_number,
+        nhs_number: piiData.nhs_number,
+        date_of_birth: piiData.date_of_birth,
+        // Clinical + lab data from AI
+        conditions: clinicalData.conditions || [],
+        smoking_status: clinicalData.smoking_status || null,
+        hba1c_mmol_mol: clinicalData.hba1c_mmol_mol || null,
+        hba1c_date: clinicalData.hba1c_date || null,
+        cholesterol_ldl: clinicalData.cholesterol_ldl || null,
+        cholesterol_hdl: clinicalData.cholesterol_hdl || null,
+        cholesterol_date: clinicalData.cholesterol_date || null,
+        blood_pressure_systolic: clinicalData.blood_pressure_systolic || null,
+        blood_pressure_diastolic: clinicalData.blood_pressure_diastolic || null,
+        bp_date: clinicalData.bp_date || null,
+        medications: clinicalData.medications || [],
+        frailty_status: clinicalData.frailty_status || null,
+        alcohol_units_per_week: clinicalData.alcohol_units_per_week || null,
+        weight_kg: clinicalData.weight_kg || null,
+        height_cm: clinicalData.height_cm || null,
+        cha2ds2_vasc_score: clinicalData.cha2ds2_vasc_score || null,
+        egfr: clinicalData.egfr || null,
+        creatinine: clinicalData.creatinine || null,
+        last_review_date: clinicalData.last_review_date || null,
+      }
+    }), { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
 
   } catch (error) {
     console.error("Error extracting patient info:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      { status: 500, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
   }
 });

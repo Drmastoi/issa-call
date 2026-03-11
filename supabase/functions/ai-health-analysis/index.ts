@@ -403,42 +403,48 @@ serve(async (req) => {
       });
 
     } else if (mode === 'analyze-all') {
-      // Batch analysis for all patients - only get patient IDs, not names
-      const { data: patients } = await supabase
-        .from('patients')
-        .select('id');
+      // Bulk query: fetch ALL recent call responses in one go, grouped by patient
+      const { data: allResponses } = await supabase
+        .from('call_responses')
+        .select('*')
+        .order('collected_at', { ascending: false })
+        .limit(1000);
 
-      let totalAlerts = 0;
+      if (!allResponses || allResponses.length === 0) {
+        return new Response(JSON.stringify({ total_alerts: 0, message: 'No data to analyze' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Group responses by patient_id (keep max 10 per patient)
+      const byPatient = new Map<string, CallResponse[]>();
+      for (const r of allResponses as CallResponse[]) {
+        const list = byPatient.get(r.patient_id) || [];
+        if (list.length < 10) list.push(r);
+        byPatient.set(r.patient_id, list);
+      }
+
       const allAlerts: HealthAlert[] = [];
+      for (const [patientId, responses] of byPatient) {
+        const anonymousRef = generateAnonymousRef(patientId);
+        const alerts = analyzePatientMetrics(responses, anonymousRef);
+        allAlerts.push(...alerts);
+      }
 
-      for (const patient of patients || []) {
-        const { data: responses } = await supabase
-          .from('call_responses')
-          .select('*')
-          .eq('patient_id', patient.id)
-          .order('collected_at', { ascending: false })
-          .limit(10);
+      // Clear old unacknowledged alerts and insert new ones
+      await supabase
+        .from('health_alerts')
+        .delete()
+        .is('acknowledged_at', null);
 
-        if (responses && responses.length > 0) {
-          // Use anonymous reference instead of patient name
-          const anonymousRef = generateAnonymousRef(patient.id);
-          const alerts = analyzePatientMetrics(responses as CallResponse[], anonymousRef);
-          allAlerts.push(...alerts);
-          totalAlerts += alerts.length;
+      if (allAlerts.length > 0) {
+        // Insert in batches of 100 to avoid payload limits
+        for (let i = 0; i < allAlerts.length; i += 100) {
+          await supabase.from('health_alerts').insert(allAlerts.slice(i, i + 100));
         }
       }
 
-      // Clear old alerts and insert new ones
-      if (allAlerts.length > 0) {
-        await supabase
-          .from('health_alerts')
-          .delete()
-          .is('acknowledged_at', null);
-
-        await supabase.from('health_alerts').insert(allAlerts);
-      }
-
-      return new Response(JSON.stringify({ total_alerts: totalAlerts, message: 'Batch analysis complete' }), {
+      return new Response(JSON.stringify({ total_alerts: allAlerts.length, patients_analyzed: byPatient.size, message: 'Batch analysis complete' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
 
