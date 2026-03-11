@@ -42,6 +42,11 @@ export default function Patients() {
   const [metricsPatient, setMetricsPatient] = useState<Patient | null>(null);
   const [detailPatientId, setDetailPatientId] = useState<string | null>(null);
   const [bulkSummaryProgress, setBulkSummaryProgress] = useState<{ current: number; total: number } | null>(null);
+  const [sortField, setSortField] = useState<'name' | 'created_at' | 'nhs_number'>('created_at');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [page, setPage] = useState(0);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const pageSize = 25;
   const { user } = useAuth();
   const { logAction } = useAuditLog();
   const { toast } = useToast();
