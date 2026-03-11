@@ -5,8 +5,7 @@ import {
   Plus, 
   Users, 
   Phone, 
-  ClipboardCheck, 
-  FileText, 
+  ShieldCheck, 
   Upload,
   Zap
 } from 'lucide-react';
@@ -40,7 +39,7 @@ const quickActions: QuickAction[] = [
   {
     id: 'verify-responses',
     label: 'Verify',
-    icon: <ClipboardCheck className="h-4 w-4" />,
+    icon: <ShieldCheck className="h-4 w-4" />,
     description: 'Review pending verifications',
     path: '/clinical-verification',
     variant: 'outline',
@@ -51,14 +50,6 @@ const quickActions: QuickAction[] = [
     icon: <Phone className="h-4 w-4" />,
     description: 'View call history',
     path: '/calls',
-    variant: 'secondary',
-  },
-  {
-    id: 'export-data',
-    label: 'Export',
-    icon: <FileText className="h-4 w-4" />,
-    description: 'Export patient data',
-    path: '/export',
     variant: 'secondary',
   },
   {
