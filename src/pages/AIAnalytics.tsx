@@ -1178,46 +1178,6 @@ export default function AIAnalytics() {
           </Card>
         </div>
 
-        {/* Health Alerts */}
-        {healthAlerts.length > 0 && (
-          <Card className="shadow-sm animate-fade-in" style={{ animationDelay: '550ms' }}>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-destructive/10 rounded-lg">
-                  <AlertTriangle className="h-5 w-5 text-destructive" />
-                </div>
-                <div>
-                  <CardTitle>Unresolved Health Alerts</CardTitle>
-                  <CardDescription>{healthAlerts.length} alerts requiring attention</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {healthAlerts.slice(0, 6).map((alert: any) => (
-                  <div key={alert.id} className={`p-4 rounded-xl border ${getSeverityColor(alert.severity)} hover:shadow-md transition-all`}>
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <span className="font-medium text-sm">{alert.title}</span>
-                      <Badge variant={alert.severity === 'critical' ? 'destructive' : 'secondary'} className="text-xs">
-                        {alert.severity}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{alert.description}</p>
-                    {alert.patients && (
-                      <Link 
-                        to={`/patients?search=${encodeURIComponent(alert.patients.name)}`}
-                        className="flex items-center gap-1 text-xs text-primary hover:underline"
-                      >
-                        <User className="h-3 w-3" />
-                        {alert.patients.name}
-                      </Link>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
       </div>
     </TooltipProvider>
   );
