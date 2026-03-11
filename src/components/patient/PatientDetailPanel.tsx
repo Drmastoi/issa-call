@@ -777,29 +777,156 @@ export function PatientDetailPanel({ patientId, isOpen, onClose }: PatientDetail
             {/* Clinical Data Tab */}
             <TabsContent value="clinical" className="m-0">
               <div className="space-y-4">
+                {/* Data Source Indicator */}
+                {patient.ai_extracted_at && (
+                  <div className="flex items-center gap-2 p-2 rounded-md bg-primary/5 border border-primary/10">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    <span className="text-xs text-muted-foreground">
+                      AI-extracted data last updated {formatDate(patient.ai_extracted_at)}
+                    </span>
+                  </div>
+                )}
+
+                {/* Safety-Critical Info Row */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {/* DNACPR */}
+                  <Card className={patient.dnacpr_status === 'In Place' ? 'border-destructive/40 bg-destructive/5' : ''}>
+                    <CardContent className="pt-4 pb-3">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                        <Shield className="h-3 w-3" /> DNACPR
+                      </div>
+                      <p className={`font-semibold ${
+                        patient.dnacpr_status === 'In Place' ? 'text-destructive' :
+                        patient.dnacpr_status === 'Not in Place' ? 'text-green-600' : 'text-muted-foreground'
+                      }`}>
+                        {patient.dnacpr_status || 'Not recorded'}
+                      </p>
+                      {patient.dnacpr_date && (
+                        <p className="text-xs text-muted-foreground mt-0.5">{formatDate(patient.dnacpr_date)}</p>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Frailty */}
+                  <Card className={
+                    patient.frailty_status === 'severe' ? 'border-destructive/40 bg-destructive/5' :
+                    patient.frailty_status === 'moderate' ? 'border-amber-300 bg-amber-50' : ''
+                  }>
+                    <CardContent className="pt-4 pb-3">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                        <Accessibility className="h-3 w-3" /> Frailty Status
+                      </div>
+                      <p className={`font-semibold capitalize ${
+                        patient.frailty_status === 'severe' ? 'text-destructive' :
+                        patient.frailty_status === 'moderate' ? 'text-amber-700' :
+                        patient.frailty_status === 'mild' ? 'text-green-600' : 'text-muted-foreground'
+                      }`}>
+                        {patient.frailty_status || 'Not assessed'}
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  {/* Allergies */}
+                  <Card className={patient.allergies && patient.allergies.length > 0 ? 'border-amber-300 bg-amber-50' : ''}>
+                    <CardContent className="pt-4 pb-3">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                        <AlertTriangle className="h-3 w-3" /> Allergies
+                      </div>
+                      {patient.allergies && patient.allergies.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {patient.allergies.map((a, i) => (
+                            <Badge key={i} variant="destructive" className="text-xs bg-amber-100 text-amber-800 border-amber-300">
+                              {a}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-muted-foreground font-semibold">NKDA</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Conditions & Medications */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Heart className="h-4 w-4 text-primary" />
+                        Active Conditions
+                        {patient.conditions && patient.conditions.length > 0 && (
+                          <Badge variant="secondary" className="ml-auto text-xs">{patient.conditions.length}</Badge>
+                        )}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {patient.conditions && patient.conditions.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {patient.conditions.map((c, i) => (
+                            <Badge key={i} variant="secondary">{c}</Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground italic">No conditions recorded</p>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Pill className="h-4 w-4 text-primary" />
+                        Current Medications
+                        {patient.medications && patient.medications.length > 0 && (
+                          <Badge variant="secondary" className="ml-auto text-xs">{patient.medications.length}</Badge>
+                        )}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {patient.medications && patient.medications.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {patient.medications.map((m, i) => (
+                            <Badge key={i} variant="outline">{m}</Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground italic">No medications recorded</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
                 {/* Vital Signs */}
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm flex items-center gap-2">
                       <HeartPulse className="h-4 w-4 text-primary" />
                       Latest Vital Signs
-                      {latestResponse && (
+                      {latestResponse ? (
                         <Badge variant="outline" className="ml-auto text-xs">
                           {formatDate(latestResponse.collected_at)}
                         </Badge>
-                      )}
+                      ) : patient.ai_extracted_at ? (
+                        <Badge variant="outline" className="ml-auto text-xs">From extraction</Badge>
+                      ) : null}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div className="space-y-1">
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
                           <Heart className="h-3 w-3" /> Blood Pressure
                         </div>
-                        <p className="text-lg font-semibold">
+                        <p className={`text-lg font-semibold ${
+                          latestResponse?.blood_pressure_systolic && latestResponse.blood_pressure_systolic > 140
+                            ? 'text-destructive' : ''
+                        }`}>
                           {latestResponse?.blood_pressure_systolic && latestResponse?.blood_pressure_diastolic
-                            ? `${latestResponse.blood_pressure_systolic}/${latestResponse.blood_pressure_diastolic} mmHg`
+                            ? `${latestResponse.blood_pressure_systolic}/${latestResponse.blood_pressure_diastolic}`
                             : '-'}
+                          {latestResponse?.blood_pressure_systolic && (
+                            <span className="text-xs font-normal text-muted-foreground ml-1">mmHg</span>
+                          )}
                         </p>
                       </div>
                       <div className="space-y-1">
@@ -807,7 +934,10 @@ export function PatientDetailPanel({ patientId, isOpen, onClose }: PatientDetail
                           <Activity className="h-3 w-3" /> Pulse
                         </div>
                         <p className="text-lg font-semibold">
-                          {latestResponse?.pulse_rate ? `${latestResponse.pulse_rate} bpm` : '-'}
+                          {latestResponse?.pulse_rate ? `${latestResponse.pulse_rate}` : '-'}
+                          {latestResponse?.pulse_rate && (
+                            <span className="text-xs font-normal text-muted-foreground ml-1">bpm</span>
+                          )}
                         </p>
                       </div>
                       <div className="space-y-1">
@@ -815,24 +945,81 @@ export function PatientDetailPanel({ patientId, isOpen, onClose }: PatientDetail
                           <Scale className="h-3 w-3" /> Weight
                         </div>
                         <p className="text-lg font-semibold">
-                          {latestResponse?.weight_kg ? `${latestResponse.weight_kg} kg` : '-'}
+                          {latestResponse?.weight_kg ? `${latestResponse.weight_kg}` : '-'}
+                          {latestResponse?.weight_kg && (
+                            <span className="text-xs font-normal text-muted-foreground ml-1">kg</span>
+                          )}
                         </p>
                       </div>
                       <div className="space-y-1">
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Ruler className="h-3 w-3" /> Height
-                        </div>
+                        <div className="text-xs text-muted-foreground">BMI</div>
+                        <p className={`text-lg font-semibold ${
+                          bmi && parseFloat(bmi) > 30 ? 'text-amber-600' :
+                          bmi && parseFloat(bmi) < 18.5 ? 'text-amber-600' : ''
+                        }`}>
+                          {bmi || '-'}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Lab Results & Scores */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Brain className="h-4 w-4 text-primary" />
+                      Lab Results & Clinical Scores
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <div className="space-y-1 p-2 rounded-md bg-muted/50">
+                        <div className="text-xs text-muted-foreground">HbA1c</div>
+                        <p className={`text-lg font-semibold ${
+                          patient.hba1c_mmol_mol && patient.hba1c_mmol_mol > 58 ? 'text-destructive' : ''
+                        }`}>
+                          {patient.hba1c_mmol_mol ? `${patient.hba1c_mmol_mol}` : '-'}
+                          {patient.hba1c_mmol_mol && (
+                            <span className="text-xs font-normal text-muted-foreground ml-1">mmol/mol</span>
+                          )}
+                        </p>
+                        {patient.hba1c_date && (
+                          <p className="text-xs text-muted-foreground">{formatDate(patient.hba1c_date)}</p>
+                        )}
+                      </div>
+                      <div className="space-y-1 p-2 rounded-md bg-muted/50">
+                        <div className="text-xs text-muted-foreground">LDL Cholesterol</div>
+                        <p className={`text-lg font-semibold ${
+                          patient.cholesterol_ldl && patient.cholesterol_ldl > 2.0 ? 'text-amber-600' : ''
+                        }`}>
+                          {patient.cholesterol_ldl ? `${patient.cholesterol_ldl}` : '-'}
+                          {patient.cholesterol_ldl && (
+                            <span className="text-xs font-normal text-muted-foreground ml-1">mmol/L</span>
+                          )}
+                        </p>
+                        {patient.cholesterol_date && (
+                          <p className="text-xs text-muted-foreground">{formatDate(patient.cholesterol_date)}</p>
+                        )}
+                      </div>
+                      <div className="space-y-1 p-2 rounded-md bg-muted/50">
+                        <div className="text-xs text-muted-foreground">HDL Cholesterol</div>
                         <p className="text-lg font-semibold">
-                          {latestResponse?.height_cm ? `${latestResponse.height_cm} cm` : '-'}
+                          {patient.cholesterol_hdl ? `${patient.cholesterol_hdl}` : '-'}
+                          {patient.cholesterol_hdl && (
+                            <span className="text-xs font-normal text-muted-foreground ml-1">mmol/L</span>
+                          )}
                         </p>
                       </div>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          BMI
-                        </div>
-                        <p className="text-lg font-semibold">{bmi || '-'}</p>
+                      <div className="space-y-1 p-2 rounded-md bg-muted/50">
+                        <div className="text-xs text-muted-foreground">CHA₂DS₂-VASc</div>
+                        <p className={`text-lg font-semibold ${
+                          patient.cha2ds2_vasc_score && patient.cha2ds2_vasc_score >= 2 ? 'text-amber-600' : ''
+                        }`}>
+                          {patient.cha2ds2_vasc_score ?? '-'}
+                        </p>
                       </div>
-                      <div className="space-y-1">
+                      <div className="space-y-1 p-2 rounded-md bg-muted/50">
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
                           <Cigarette className="h-3 w-3" /> Smoking
                         </div>
@@ -840,53 +1027,72 @@ export function PatientDetailPanel({ patientId, isOpen, onClose }: PatientDetail
                           {latestResponse?.smoking_status || '-'}
                         </p>
                       </div>
+                      <div className="space-y-1 p-2 rounded-md bg-muted/50">
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Wine className="h-3 w-3" /> Alcohol
+                        </div>
+                        <p className="text-lg font-semibold">
+                          {latestResponse?.alcohol_units_per_week !== null && latestResponse?.alcohol_units_per_week !== undefined
+                            ? `${latestResponse.alcohol_units_per_week}`
+                            : '-'}
+                          {latestResponse?.alcohol_units_per_week != null && (
+                            <span className="text-xs font-normal text-muted-foreground ml-1">units/wk</span>
+                          )}
+                        </p>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* Clinical Values */}
+                {/* Care Needs */}
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm flex items-center gap-2">
-                      <Brain className="h-4 w-4 text-primary" />
-                      Clinical Values
+                      <Home className="h-4 w-4 text-primary" />
+                      Care Needs & Context
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                      <div className="space-y-1">
-                        <div className="text-xs text-muted-foreground">HbA1c</div>
-                        <p className="text-lg font-semibold">
-                          {patient.hba1c_mmol_mol ? `${patient.hba1c_mmol_mol} mmol/mol` : '-'}
-                        </p>
-                        {patient.hba1c_date && (
-                          <p className="text-xs text-muted-foreground">{formatDate(patient.hba1c_date)}</p>
-                        )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="space-y-1 p-2 rounded-md bg-muted/50">
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Accessibility className="h-3 w-3" /> Mobility
+                        </div>
+                        <p className="text-sm font-medium">{patient.mobility_status || 'Not recorded'}</p>
                       </div>
-                      <div className="space-y-1">
-                        <div className="text-xs text-muted-foreground">LDL Cholesterol</div>
-                        <p className="text-lg font-semibold">
-                          {patient.cholesterol_ldl ? `${patient.cholesterol_ldl} mmol/L` : '-'}
+                      <div className="space-y-1 p-2 rounded-md bg-muted/50">
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Apple className="h-3 w-3" /> Dietary Requirements
+                        </div>
+                        <p className="text-sm font-medium">{patient.dietary_requirements || 'Not recorded'}</p>
+                      </div>
+                      <div className="space-y-1 p-2 rounded-md bg-muted/50">
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <MessageSquare className="h-3 w-3" /> Communication Needs
+                        </div>
+                        <p className="text-sm font-medium">{patient.communication_needs || 'No special needs'}</p>
+                      </div>
+                      <div className="space-y-1 p-2 rounded-md bg-muted/50">
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Home className="h-3 w-3" /> Care Home
+                        </div>
+                        <p className="text-sm font-medium">{patient.care_home_name || 'Not recorded'}</p>
+                      </div>
+                      <div className="space-y-1 p-2 rounded-md bg-muted/50">
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Calendar className="h-3 w-3" /> Last Review
+                        </div>
+                        <p className="text-sm font-medium">
+                          {patient.last_review_date ? formatDate(patient.last_review_date) : 'Not recorded'}
                         </p>
                       </div>
-                      <div className="space-y-1">
-                        <div className="text-xs text-muted-foreground">HDL Cholesterol</div>
-                        <p className="text-lg font-semibold">
-                          {patient.cholesterol_hdl ? `${patient.cholesterol_hdl} mmol/L` : '-'}
-                        </p>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="text-xs text-muted-foreground">CHA2DS2-VASc</div>
-                        <p className="text-lg font-semibold">
-                          {patient.cha2ds2_vasc_score ?? '-'}
-                        </p>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="text-xs text-muted-foreground">Alcohol</div>
-                        <p className="text-lg font-semibold">
-                          {latestResponse?.alcohol_units_per_week !== null && latestResponse?.alcohol_units_per_week !== undefined
-                            ? `${latestResponse.alcohol_units_per_week} units/wk`
-                            : '-'}
+                      <div className="space-y-1 p-2 rounded-md bg-muted/50">
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Stethoscope className="h-3 w-3" /> GP
+                        </div>
+                        <p className="text-sm font-medium">
+                          {patient.gp_name || 'Not recorded'}
+                          {patient.gp_practice && <span className="text-muted-foreground"> • {patient.gp_practice}</span>}
                         </p>
                       </div>
                     </div>
@@ -897,10 +1103,13 @@ export function PatientDetailPanel({ patientId, isOpen, onClose }: PatientDetail
                 {patient.notes && (
                   <Card>
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm">Notes</CardTitle>
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-primary" />
+                        Clinical Notes
+                      </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-sm">{patient.notes}</p>
+                      <p className="text-sm whitespace-pre-wrap">{patient.notes}</p>
                     </CardContent>
                   </Card>
                 )}
