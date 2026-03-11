@@ -262,16 +262,7 @@ export default function AIAnalytics() {
   };
 
   // Filter tasks by priority
-  const getFilteredTasks = () => {
-    let filtered = pendingTasks;
-    if (priorityFilter !== 'all') {
-      filtered = filtered.filter(t => t.priority === priorityFilter);
-    }
-    return filtered;
-  };
-
   const filteredGapPatients = getFilteredGapPatients();
-  const filteredTasks = getFilteredTasks();
 
   // Calculate KPIs with clinical data
   const kpis = {
