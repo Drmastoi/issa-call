@@ -508,16 +508,6 @@ export default function AIAnalytics() {
     exportToCSV(data, 'qof_gaps', ['Name', 'NHS_Number', 'Phone_Number', 'Has_BP', 'Has_Smoking', 'Has_Call_Data']);
   };
 
-  const exportTasks = () => {
-    const data = filteredTasks.map((t: any) => ({
-      title: t.title,
-      priority: t.priority,
-      status: t.status,
-      due_date: t.due_date ? new Date(t.due_date).toLocaleDateString() : '',
-      patient_name: t.patients?.name || '',
-    }));
-    exportToCSV(data, 'pending_tasks', ['Title', 'Priority', 'Status', 'Due_Date', 'Patient_Name']);
-  };
 
   const exportQOFProgress = () => {
     const data = QOF_INDICATORS.map(indicator => {
