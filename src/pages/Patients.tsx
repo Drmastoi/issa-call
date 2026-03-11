@@ -436,10 +436,65 @@ Jane Doe,07700900456,,Afternoon`}
       {/* Patients Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Patient List</CardTitle>
-          <CardDescription>
-            {patients?.length ?? 0} patients in database
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Patient List</CardTitle>
+              <CardDescription>
+                {patients?.length ?? 0} patients in database
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={bulkSummaryProgress !== null || !patients?.length}
+              onClick={async () => {
+                if (!patients?.length) return;
+                setBulkSummaryProgress({ current: 0, total: patients.length });
+                let completed = 0;
+                let failed = 0;
+                // Process 3 at a time
+                for (let i = 0; i < patients.length; i += 3) {
+                  const batch = patients.slice(i, i + 3);
+                  const results = await Promise.allSettled(
+                    batch.map(p =>
+                      supabase.functions.invoke('generate-patient-summary', {
+                        body: { patientId: p.id },
+                      })
+                    )
+                  );
+                  results.forEach(r => {
+                    if (r.status === 'rejected') failed++;
+                  });
+                  completed += batch.length;
+                  setBulkSummaryProgress({ current: completed, total: patients.length });
+                }
+                setBulkSummaryProgress(null);
+                queryClient.invalidateQueries({ queryKey: ['patients'] });
+                toast({
+                  title: 'Summaries regenerated',
+                  description: `${patients.length - failed} of ${patients.length} completed${failed ? `, ${failed} failed` : ''}`,
+                });
+              }}
+            >
+              {bulkSummaryProgress !== null ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  {bulkSummaryProgress.current}/{bulkSummaryProgress.total}
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Regenerate All Summaries
+                </>
+              )}
+            </Button>
+          </div>
+          {bulkSummaryProgress !== null && (
+            <Progress
+              value={(bulkSummaryProgress.current / bulkSummaryProgress.total) * 100}
+              className="mt-2 h-2"
+            />
+          )}
         </CardHeader>
         <CardContent>
           {isLoading ? (
