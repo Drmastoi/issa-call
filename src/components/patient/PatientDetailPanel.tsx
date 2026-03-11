@@ -1200,55 +1200,99 @@ export function PatientDetailPanel({ patientId, isOpen, onClose }: PatientDetail
 
             {/* AI Summaries Tab */}
             <TabsContent value="summaries" className="m-0">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Brain className="h-5 w-5 text-primary" />
-                    AI Clinical Summaries
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {aiSummaries.length > 0 ? (
-                    <div className="space-y-4">
-                      {aiSummaries.map((summary) => (
-                        <div key={summary.id} className="p-4 border rounded-lg space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Badge variant="outline">
-                              <Calendar className="h-3 w-3 mr-1" />
-                              {formatDate(summary.created_at)}
-                            </Badge>
+              <div className="space-y-4">
+                {/* Primary Clinical Summary */}
+                <ClinicalSummaryCard patient={patient} patientId={patientId} />
+
+                {/* Call-based AI Summaries */}
+                {aiSummaries.length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Phone className="h-4 w-4 text-primary" />
+                        Call-Based Summaries
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {aiSummaries.map((summary) => (
+                          <div key={summary.id} className="p-3 border rounded-lg space-y-2">
+                            <div className="flex items-center justify-between">
+                              <Badge variant="outline">
+                                <Calendar className="h-3 w-3 mr-1" />
+                                {formatDate(summary.created_at)}
+                              </Badge>
+                            </div>
+                            <p className="text-sm">{summary.clinical_summary}</p>
+                            {summary.key_findings && Array.isArray(summary.key_findings) && summary.key_findings.length > 0 && (
+                              <div className="pt-1">
+                                <p className="text-xs font-medium text-muted-foreground mb-1">Key Findings:</p>
+                                <ul className="text-sm list-disc list-inside">
+                                  {summary.key_findings.map((finding: string, i: number) => (
+                                    <li key={i}>{finding}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {summary.action_items && Array.isArray(summary.action_items) && summary.action_items.length > 0 && (
+                              <div className="pt-1">
+                                <p className="text-xs font-medium text-muted-foreground mb-1">Action Items:</p>
+                                <ul className="text-sm list-disc list-inside">
+                                  {summary.action_items.map((item: string, i: number) => (
+                                    <li key={i}>{item}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
                           </div>
-                          <p className="text-sm">{summary.clinical_summary}</p>
-                          {summary.key_findings && Array.isArray(summary.key_findings) && summary.key_findings.length > 0 && (
-                            <div className="pt-2">
-                              <p className="text-xs font-medium text-muted-foreground mb-1">Key Findings:</p>
-                              <ul className="text-sm list-disc list-inside">
-                                {summary.key_findings.map((finding: string, i: number) => (
-                                  <li key={i}>{finding}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                          {summary.action_items && Array.isArray(summary.action_items) && summary.action_items.length > 0 && (
-                            <div className="pt-2">
-                              <p className="text-xs font-medium text-muted-foreground mb-1">Action Items:</p>
-                              <ul className="text-sm list-disc list-inside">
-                                {summary.action_items.map((item: string, i: number) => (
-                                  <li key={i}>{item}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Conditions & Medications snapshot for context */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Heart className="h-4 w-4 text-primary" />
+                        Conditions ({patient.conditions?.length || 0})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {patient.conditions && patient.conditions.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {patient.conditions.map((c, i) => (
+                            <Badge key={i} variant="secondary" className="text-xs">{c}</Badge>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-center text-muted-foreground py-8">
-                      No AI summaries generated for this patient yet
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
+                      ) : (
+                        <p className="text-sm text-muted-foreground italic">None recorded</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Pill className="h-4 w-4 text-primary" />
+                        Medications ({patient.medications?.length || 0})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {patient.medications && patient.medications.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {patient.medications.map((m, i) => (
+                            <Badge key={i} variant="outline" className="text-xs">{m}</Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground italic">None recorded</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
             </TabsContent>
           </ScrollArea>
         </Tabs>
