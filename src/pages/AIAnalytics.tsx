@@ -553,21 +553,6 @@ export default function AIAnalytics() {
     exportToCSV(summary, 'analytics_summary', ['Metric', 'Value']);
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'destructive';
-      case 'medium': return 'default';
-      default: return 'secondary';
-    }
-  };
-
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'critical': return 'border-destructive/30 bg-destructive/5';
-      case 'high': return 'border-warning/30 bg-warning/5';
-      default: return 'border-muted bg-muted/30';
-    }
-  };
 
   const getStatusColor = (status: 'good' | 'warning' | 'poor') => {
     switch (status) {
