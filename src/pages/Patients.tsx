@@ -353,7 +353,12 @@ export default function Patients() {
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Patients</h1>
+          <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
+            Patients
+            <Badge variant="secondary" className="text-sm font-normal">
+              {totalPatients} total
+            </Badge>
+          </h1>
           <p className="text-muted-foreground mt-1">Manage your patient database</p>
         </div>
         <div className="flex gap-3">
