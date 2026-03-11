@@ -12,6 +12,7 @@ import { AIInsightsPanel } from '@/components/dashboard/AIInsightsPanel';
 import { RiskAlertsWidget } from '@/components/dashboard/RiskAlertsWidget';
 import { QOFProgressPanel } from '@/components/dashboard/QOFProgressPanel';
 import { MediTaskWidget } from '@/components/dashboard/MediTaskWidget';
+import { ClinicalSafetyWidget } from '@/components/dashboard/ClinicalSafetyWidget';
 import { QuickActionsWidget } from '@/components/dashboard/QuickActionsWidget';
 import { TodaysPriorities } from '@/components/dashboard/TodaysPriorities';
 import { DraggableWidget } from '@/components/dashboard/DraggableWidget';
