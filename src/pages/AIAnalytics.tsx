@@ -553,15 +553,6 @@ export default function AIAnalytics() {
     exportToCSV(summary, 'analytics_summary', ['Metric', 'Value']);
   };
 
-
-  const getStatusColor = (status: 'good' | 'warning' | 'poor') => {
-    switch (status) {
-      case 'good': return 'text-success';
-      case 'warning': return 'text-warning';
-      case 'poor': return 'text-destructive';
-    }
-  };
-
   // Calculate overall QOF score
   const overallQOFScore = groupedIndicators.length > 0
     ? Math.round(groupedIndicators.reduce((acc, cat) => acc + getCategoryScore(cat.indicators), 0) / groupedIndicators.length)
