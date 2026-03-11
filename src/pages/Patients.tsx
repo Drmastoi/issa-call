@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -9,8 +9,10 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Upload, Search, Trash2, Edit, FileSpreadsheet, Phone, Loader2, Activity, FileText, User, RefreshCw } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Plus, Upload, Search, Trash2, Edit, FileSpreadsheet, Phone, Loader2, Activity, FileText, User, RefreshCw, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { CallStatusMonitor } from '@/components/CallStatusMonitor';
@@ -40,18 +42,23 @@ export default function Patients() {
   const [metricsPatient, setMetricsPatient] = useState<Patient | null>(null);
   const [detailPatientId, setDetailPatientId] = useState<string | null>(null);
   const [bulkSummaryProgress, setBulkSummaryProgress] = useState<{ current: number; total: number } | null>(null);
+  const [sortField, setSortField] = useState<'name' | 'created_at' | 'nhs_number'>('created_at');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [page, setPage] = useState(0);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const pageSize = 25;
   const { user } = useAuth();
   const { logAction } = useAuditLog();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: patients, isLoading } = useQuery({
-    queryKey: ['patients', search],
+    queryKey: ['patients', search, sortField, sortDir],
     queryFn: async () => {
       let query = supabase
         .from('patients')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order(sortField, { ascending: sortDir === 'asc' });
       
       if (search) {
         query = query.or(`name.ilike.%${search}%,phone_number.ilike.%${search}%,nhs_number.ilike.%${search}%`);
@@ -62,6 +69,41 @@ export default function Patients() {
       return data as Patient[];
     },
   });
+
+  const totalPatients = patients?.length ?? 0;
+  const totalPages = Math.ceil(totalPatients / pageSize);
+  const paginatedPatients = useMemo(() => {
+    if (!patients) return [];
+    return patients.slice(page * pageSize, (page + 1) * pageSize);
+  }, [patients, page, pageSize]);
+
+  const toggleSort = (field: 'name' | 'created_at' | 'nhs_number') => {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+    setPage(0);
+  };
+
+  const allOnPageSelected = paginatedPatients.length > 0 && paginatedPatients.every(p => selectedIds.has(p.id));
+  const toggleSelectAll = () => {
+    if (allOnPageSelected) {
+      const newSet = new Set(selectedIds);
+      paginatedPatients.forEach(p => newSet.delete(p.id));
+      setSelectedIds(newSet);
+    } else {
+      const newSet = new Set(selectedIds);
+      paginatedPatients.forEach(p => newSet.add(p.id));
+      setSelectedIds(newSet);
+    }
+  };
+  const toggleSelect = (id: string) => {
+    const newSet = new Set(selectedIds);
+    if (newSet.has(id)) newSet.delete(id); else newSet.add(id);
+    setSelectedIds(newSet);
+  };
 
   const addPatientMutation = useMutation({
     mutationFn: async (patient: { name: string; phone_number: string; nhs_number?: string | null; preferred_call_time?: string | null; notes?: string | null }) => {
@@ -311,7 +353,12 @@ export default function Patients() {
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Patients</h1>
+          <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
+            Patients
+            <Badge variant="secondary" className="text-sm font-normal">
+              {totalPatients} total
+            </Badge>
+          </h1>
           <p className="text-muted-foreground mt-1">Manage your patient database</p>
         </div>
         <div className="flex gap-3">
@@ -440,7 +487,7 @@ Jane Doe,07700900456,,Afternoon`}
             <div>
               <CardTitle>Patient List</CardTitle>
               <CardDescription>
-                {patients?.length ?? 0} patients in database
+                {selectedIds.size > 0 ? `${selectedIds.size} selected · ` : ''}{totalPatients} patients in database
               </CardDescription>
             </div>
             <Button
@@ -500,93 +547,115 @@ Jane Doe,07700900456,,Afternoon`}
           {isLoading ? (
             <div className="text-center py-8 text-muted-foreground">Loading...</div>
           ) : patients && patients.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Phone Number</TableHead>
-                  <TableHead>NHS Number</TableHead>
-                  <TableHead>Preferred Time</TableHead>
-                  <TableHead>Added</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {patients.map((patient) => (
-                  <TableRow key={patient.id}>
-                    <TableCell className="font-medium">
-                      {patient.name && patient.name.length < 60 && !patient.name.includes('  ') && !/\b(review from|allocated|assessment|preference|oedema|telephone|consent|having|likely|Template|Medication Monitoring)\b/i.test(patient.name)
-                        ? patient.name
-                        : (
-                          <span className="flex items-center gap-2">
-                            <User className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-muted-foreground">
-                              {patient.nhs_number ? `NHS: ${patient.nhs_number}` : `ID: ${patient.id.substring(0, 8).toUpperCase()}`}
-                            </span>
-                            <span className="text-xs text-destructive">(name not extracted)</span>
-                          </span>
-                        )
-                      }
-                    </TableCell>
-                    <TableCell>{patient.phone_number}</TableCell>
-                    <TableCell>{patient.nhs_number || '-'}</TableCell>
-                    <TableCell>{patient.preferred_call_time || '-'}</TableCell>
-                    <TableCell>
-                      {new Date(patient.created_at).toLocaleDateString('en-GB')}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setDetailPatientId(patient.id)}
-                          title="View patient details"
-                        >
-                          <User className="h-4 w-4 text-blue-600" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setMetricsPatient(patient)}
-                          title="View health metrics"
-                        >
-                          <Activity className="h-4 w-4 text-green-600" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => testCallMutation.mutate(patient)}
-                          disabled={callingPatientId === patient.id}
-                          title="Test call"
-                        >
-                          {callingPatientId === patient.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Phone className="h-4 w-4 text-primary" />
-                          )}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setEditingPatient(patient)}
-                          title="Edit patient"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => deletePatientMutation.mutate(patient.id)}
-                          title="Delete patient"
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={allOnPageSelected}
+                        onCheckedChange={toggleSelectAll}
+                        aria-label="Select all on page"
+                      />
+                    </TableHead>
+                    <TableHead>
+                      <button onClick={() => toggleSort('name')} className="flex items-center gap-1 hover:text-foreground transition-colors">
+                        Name <ArrowUpDown className="h-3 w-3" />
+                      </button>
+                    </TableHead>
+                    <TableHead>Phone Number</TableHead>
+                    <TableHead>
+                      <button onClick={() => toggleSort('nhs_number')} className="flex items-center gap-1 hover:text-foreground transition-colors">
+                        NHS Number <ArrowUpDown className="h-3 w-3" />
+                      </button>
+                    </TableHead>
+                    <TableHead>Preferred Time</TableHead>
+                    <TableHead>
+                      <button onClick={() => toggleSort('created_at')} className="flex items-center gap-1 hover:text-foreground transition-colors">
+                        Added <ArrowUpDown className="h-3 w-3" />
+                      </button>
+                    </TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {paginatedPatients.map((patient) => (
+                    <TableRow key={patient.id} data-state={selectedIds.has(patient.id) ? 'selected' : undefined}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.has(patient.id)}
+                          onCheckedChange={() => toggleSelect(patient.id)}
+                          aria-label={`Select ${patient.name}`}
+                        />
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {patient.name && patient.name.length < 60 && !patient.name.includes('  ') && !/\b(review from|allocated|assessment|preference|oedema|telephone|consent|having|likely|Template|Medication Monitoring)\b/i.test(patient.name)
+                          ? patient.name
+                          : (
+                            <span className="flex items-center gap-2">
+                              <User className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-muted-foreground">
+                                {patient.nhs_number ? `NHS: ${patient.nhs_number}` : `ID: ${patient.id.substring(0, 8).toUpperCase()}`}
+                              </span>
+                              <span className="text-xs text-destructive">(name not extracted)</span>
+                            </span>
+                          )
+                        }
+                      </TableCell>
+                      <TableCell>{patient.phone_number}</TableCell>
+                      <TableCell>{patient.nhs_number || '-'}</TableCell>
+                      <TableCell>{patient.preferred_call_time || '-'}</TableCell>
+                      <TableCell>
+                        {new Date(patient.created_at).toLocaleDateString('en-GB')}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => setDetailPatientId(patient.id)} aria-label="View patient details">
+                            <User className="h-4 w-4 text-primary" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => setMetricsPatient(patient)} aria-label="View health metrics">
+                            <Activity className="h-4 w-4 text-accent" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => testCallMutation.mutate(patient)} disabled={callingPatientId === patient.id} aria-label="Test call">
+                            {callingPatientId === patient.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Phone className="h-4 w-4 text-primary" />
+                            )}
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => setEditingPatient(patient)} aria-label="Edit patient">
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => deletePatientMutation.mutate(patient.id)} aria-label="Delete patient">
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between pt-4 border-t mt-4">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {page * pageSize + 1}–{Math.min((page + 1) * pageSize, totalPatients)} of {totalPatients}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(p => p - 1)} aria-label="Previous page">
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm font-medium">
+                      {page + 1} / {totalPages}
+                    </span>
+                    <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)} aria-label="Next page">
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               No patients found. Add your first patient or upload a CSV file.
