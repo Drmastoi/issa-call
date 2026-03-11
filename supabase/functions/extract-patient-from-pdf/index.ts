@@ -52,10 +52,40 @@ function extractPIILocally(text: string): {
     }
   }
 
-  // Extract patient name (look for common patterns)
-  const nameMatch = text.match(/(?:Patient\s*(?:Name)?|Name)\s*:?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i) ||
-                    text.match(/(?:Mr|Mrs|Ms|Miss|Dr)\.?\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i);
-  const name = nameMatch ? nameMatch[1].trim() : null;
+  // Extract patient name - look for structured patterns first, then title-based
+  const namePatterns = [
+    // "Patient Name: John Smith" or "Patient: John Smith"
+    /(?:Patient\s*(?:Name)?)\s*:?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})/i,
+    // "Name: John Smith"
+    /(?:^|\n)\s*Name\s*:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})/im,
+    // "Mr/Mrs/Dr John Smith" at start of line or after common delimiters
+    /(?:^|\n)\s*(?:Mr|Mrs|Ms|Miss|Dr|Prof)\.?\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})/im,
+    // "Surname: Smith" + "Forename: John" pattern
+    /(?:Surname|Last\s*Name)\s*:\s*([A-Z][a-z]+)/i,
+  ];
+  
+  let name: string | null = null;
+  for (const pattern of namePatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      const candidate = match[1].trim();
+      // Validate: real names are typically 2-4 words, each capitalized, no medical terms
+      const medicalTerms = /\b(review|assessment|allocated|consent|telephone|medication|monitoring|template|oedema|preference|having|likely|care|home|residence|register|steroid|dementia|specialist|end of life)\b/i;
+      if (!medicalTerms.test(candidate) && candidate.length >= 3 && candidate.length <= 50) {
+        name = candidate;
+        break;
+      }
+    }
+  }
+  
+  // Also try to find forename + surname separately
+  if (!name) {
+    const forenameMatch = text.match(/(?:Forename|First\s*Name|Given\s*Name)\s*:\s*([A-Z][a-z]+)/i);
+    const surnameMatch = text.match(/(?:Surname|Last\s*Name|Family\s*Name)\s*:\s*([A-Z][a-z]+)/i);
+    if (forenameMatch && surnameMatch) {
+      name = `${forenameMatch[1].trim()} ${surnameMatch[1].trim()}`;
+    }
+  }
 
   return {
     name,

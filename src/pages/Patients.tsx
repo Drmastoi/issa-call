@@ -514,7 +514,20 @@ Jane Doe,07700900456,,Afternoon`}
               <TableBody>
                 {patients.map((patient) => (
                   <TableRow key={patient.id}>
-                    <TableCell className="font-medium">{patient.name}</TableCell>
+                    <TableCell className="font-medium">
+                      {patient.name && patient.name.length < 60 && !patient.name.includes('  ') && !/\b(review from|allocated|assessment|preference|oedema|telephone|consent|having|likely|Template|Medication Monitoring)\b/i.test(patient.name)
+                        ? patient.name
+                        : (
+                          <span className="flex items-center gap-2">
+                            <User className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-muted-foreground">
+                              {patient.nhs_number ? `NHS: ${patient.nhs_number}` : `ID: ${patient.id.substring(0, 8).toUpperCase()}`}
+                            </span>
+                            <span className="text-xs text-destructive">(name not extracted)</span>
+                          </span>
+                        )
+                      }
+                    </TableCell>
                     <TableCell>{patient.phone_number}</TableCell>
                     <TableCell>{patient.nhs_number || '-'}</TableCell>
                     <TableCell>{patient.preferred_call_time || '-'}</TableCell>
