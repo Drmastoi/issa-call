@@ -677,77 +677,65 @@ export default function AIAnalytics() {
 
           {/* KPI Stats Grid */}
           <div className="lg:col-span-3 grid grid-cols-2 md:grid-cols-3 gap-4">
-            <Card className="relative overflow-hidden border-0 shadow-md hover:shadow-lg transition-all animate-fade-in" style={{ animationDelay: '100ms' }}>
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent" />
-              <CardContent className="pt-5 relative">
-                <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                  <Users className="h-4 w-4" />
-                  <span className="text-xs">Total Patients</span>
-                </div>
-                <p className="text-2xl font-bold">{kpis.totalPatients}</p>
-                <p className="text-xs text-muted-foreground mt-1">{kpis.patientsWithData} with data</p>
-              </CardContent>
-            </Card>
-            
-            <Card className="relative overflow-hidden border-0 shadow-md hover:shadow-lg transition-all animate-fade-in" style={{ animationDelay: '150ms' }}>
-              <div className="absolute inset-0 bg-gradient-to-br from-success/10 via-success/5 to-transparent" />
-              <CardContent className="pt-5 relative">
-                <div className="flex items-center gap-2 text-success mb-1">
-                  <Target className="h-4 w-4" />
-                  <span className="text-xs">Data Complete</span>
-                </div>
-                <p className="text-2xl font-bold">{kpis.dataCompleteness}%</p>
-                <Progress value={kpis.dataCompleteness} className="h-1.5 mt-2" />
-              </CardContent>
-            </Card>
-
-            <Card className="relative overflow-hidden border-0 shadow-md hover:shadow-lg transition-all animate-fade-in" style={{ animationDelay: '200ms' }}>
-              <div className="absolute inset-0 bg-gradient-to-br from-accent/10 via-accent/5 to-transparent" />
-              <CardContent className="pt-5 relative">
-                <div className="flex items-center gap-2 text-accent mb-1">
-                  <Sparkles className="h-4 w-4" />
-                  <span className="text-xs">AI Summaries</span>
-                </div>
-                <p className="text-2xl font-bold">{kpis.aiSummariesGenerated}</p>
-                <p className="text-xs text-muted-foreground mt-1">Generated</p>
-              </CardContent>
-            </Card>
-
-            <Card className="relative overflow-hidden border-0 shadow-md hover:shadow-lg transition-all animate-fade-in" style={{ animationDelay: '250ms' }}>
-              <div className="absolute inset-0 bg-gradient-to-br from-warning/10 via-warning/5 to-transparent" />
-              <CardContent className="pt-5 relative">
-                <div className="flex items-center gap-2 text-warning mb-1">
-                  <ClipboardList className="h-4 w-4" />
-                  <span className="text-xs">Pending Tasks</span>
-                </div>
-                <p className="text-2xl font-bold">{kpis.pendingTasksCount}</p>
-                <p className="text-xs text-muted-foreground mt-1">{kpis.highPriorityTasks} high priority</p>
-              </CardContent>
-            </Card>
-
-            <Card className="relative overflow-hidden border-0 shadow-md hover:shadow-lg transition-all animate-fade-in" style={{ animationDelay: '300ms' }}>
-              <div className="absolute inset-0 bg-gradient-to-br from-destructive/10 via-destructive/5 to-transparent" />
-              <CardContent className="pt-5 relative">
-                <div className="flex items-center gap-2 text-destructive mb-1">
-                  <AlertTriangle className="h-4 w-4" />
-                  <span className="text-xs">Active Alerts</span>
-                </div>
-                <p className="text-2xl font-bold">{kpis.unresolvedAlerts}</p>
-                <p className="text-xs text-muted-foreground mt-1">{kpis.criticalAlerts} critical</p>
-              </CardContent>
-            </Card>
-
-            <Card className="relative overflow-hidden border-0 shadow-md hover:shadow-lg transition-all animate-fade-in" style={{ animationDelay: '350ms' }}>
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent" />
-              <CardContent className="pt-5 relative">
-                <div className="flex items-center gap-2 text-primary mb-1">
-                  <Activity className="h-4 w-4" />
-                  <span className="text-xs">With Conditions</span>
-                </div>
-                <p className="text-2xl font-bold">{kpis.patientsWithConditions}</p>
-                <p className="text-xs text-muted-foreground mt-1">Tracked patients</p>
-              </CardContent>
-            </Card>
+            <KPICard
+              title="Total Patients"
+              value={kpis.totalPatients}
+              subtitle={`${kpis.patientsWithData} with data`}
+              icon={Users}
+              iconColor="text-primary"
+              gradientFrom="from-primary/10 via-primary/5"
+              delay={100}
+            />
+            <KPICard
+              title="Data Completeness"
+              value={`${kpis.dataCompleteness}%`}
+              icon={Target}
+              iconColor="text-success"
+              gradientFrom="from-success/10 via-success/5"
+              delay={150}
+              footer={<Progress value={kpis.dataCompleteness} className="h-1.5" />}
+            />
+            <KPICard
+              title="AI Summaries"
+              value={kpis.aiSummariesGenerated}
+              subtitle="Generated"
+              icon={Sparkles}
+              iconColor="text-accent"
+              gradientFrom="from-accent/10 via-accent/5"
+              delay={200}
+            />
+            <KPICard
+              title="Active Alerts"
+              value={kpis.unresolvedAlerts}
+              subtitle={`${kpis.criticalAlerts} critical`}
+              icon={AlertTriangle}
+              iconColor="text-destructive"
+              gradientFrom="from-destructive/10 via-destructive/5"
+              delay={250}
+            />
+            <KPICard
+              title="Pending Tasks"
+              value={kpis.pendingTasksCount}
+              subtitle={`${kpis.highPriorityTasks} high priority`}
+              icon={ClipboardList}
+              iconColor="text-warning"
+              gradientFrom="from-warning/10 via-warning/5"
+              delay={300}
+              footer={
+                <Link to="/meditask" className="text-xs text-primary hover:underline">
+                  View tasks →
+                </Link>
+              }
+            />
+            <KPICard
+              title="With Conditions"
+              value={kpis.patientsWithConditions}
+              subtitle="Tracked patients"
+              icon={Activity}
+              iconColor="text-primary"
+              gradientFrom="from-primary/10 via-primary/5"
+              delay={350}
+            />
           </div>
         </div>
 
