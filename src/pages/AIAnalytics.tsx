@@ -39,7 +39,8 @@ import {
   ListChecks,
   Sparkles,
   BarChart3,
-  Zap
+  Zap,
+  RefreshCw
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { QOF_INDICATORS, QOF_CATEGORIES, calculateQOFProgress } from '@/lib/qof-codes';
