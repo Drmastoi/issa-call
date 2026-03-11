@@ -65,9 +65,7 @@ export default function AIAnalytics() {
   const [gapFilter, setGapFilter] = useState<GapFilter>('all');
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [categoryTab, setCategoryTab] = useState<CategoryTab>('all');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['Cardiovascular']));
-  const [viewTab, setViewTab] = useState<ViewTab>('actions');
 
   // Fetch patients with clinical data
   const { data: patients = [] } = useQuery({
