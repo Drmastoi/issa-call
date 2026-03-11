@@ -53,12 +53,12 @@ export default function Patients() {
   const queryClient = useQueryClient();
 
   const { data: patients, isLoading } = useQuery({
-    queryKey: ['patients', search],
+    queryKey: ['patients', search, sortField, sortDir],
     queryFn: async () => {
       let query = supabase
         .from('patients')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order(sortField, { ascending: sortDir === 'asc' });
       
       if (search) {
         query = query.or(`name.ilike.%${search}%,phone_number.ilike.%${search}%,nhs_number.ilike.%${search}%`);
@@ -69,6 +69,41 @@ export default function Patients() {
       return data as Patient[];
     },
   });
+
+  const totalPatients = patients?.length ?? 0;
+  const totalPages = Math.ceil(totalPatients / pageSize);
+  const paginatedPatients = useMemo(() => {
+    if (!patients) return [];
+    return patients.slice(page * pageSize, (page + 1) * pageSize);
+  }, [patients, page, pageSize]);
+
+  const toggleSort = (field: 'name' | 'created_at' | 'nhs_number') => {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+    setPage(0);
+  };
+
+  const allOnPageSelected = paginatedPatients.length > 0 && paginatedPatients.every(p => selectedIds.has(p.id));
+  const toggleSelectAll = () => {
+    if (allOnPageSelected) {
+      const newSet = new Set(selectedIds);
+      paginatedPatients.forEach(p => newSet.delete(p.id));
+      setSelectedIds(newSet);
+    } else {
+      const newSet = new Set(selectedIds);
+      paginatedPatients.forEach(p => newSet.add(p.id));
+      setSelectedIds(newSet);
+    }
+  };
+  const toggleSelect = (id: string) => {
+    const newSet = new Set(selectedIds);
+    if (newSet.has(id)) newSet.delete(id); else newSet.add(id);
+    setSelectedIds(newSet);
+  };
 
   const addPatientMutation = useMutation({
     mutationFn: async (patient: { name: string; phone_number: string; nhs_number?: string | null; preferred_call_time?: string | null; notes?: string | null }) => {
