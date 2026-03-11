@@ -13,6 +13,7 @@ const DEFAULT_LAYOUT: WidgetConfig[] = [
   { id: 'risk-alerts', title: 'Risk Alerts', visible: true },
   { id: 'qof-progress', title: 'QOF Progress', visible: true },
   { id: 'meditask', title: 'MediTask', visible: true },
+  { id: 'clinical-safety', title: 'Clinical Safety', visible: true },
   { id: 'recent-calls', title: 'Recent Calls', visible: true },
   { id: 'upcoming-batches', title: 'Upcoming Batches', visible: true },
 ];
