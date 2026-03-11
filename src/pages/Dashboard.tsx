@@ -66,7 +66,7 @@ export default function Dashboard() {
     })
   );
 
-  const { data: stats } = useQuery({
+  const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: async () => {
       const [patients, batches, calls, completedCalls] = await Promise.all([
