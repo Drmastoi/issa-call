@@ -157,7 +157,7 @@ function ClinicalSummaryCard({ patient, patientId }: { patient: PatientData; pat
   );
 }
 
-
+export function PatientDetailPanel({ patientId, isOpen, onClose }: PatientDetailPanelProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [extractText, setExtractText] = useState('');
