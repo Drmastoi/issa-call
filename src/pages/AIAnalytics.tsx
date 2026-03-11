@@ -8,7 +8,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
@@ -23,7 +22,6 @@ import {
   ArrowRight,
   Activity,
   Target,
-  FileWarning,
   User,
   Download,
   Filter,
@@ -36,7 +34,6 @@ import {
   ChevronDown,
   ChevronRight,
   Info,
-  ListChecks,
   Sparkles,
   BarChart3,
   Zap,
@@ -44,13 +41,11 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { QOF_INDICATORS, QOF_CATEGORIES, calculateQOFProgress } from '@/lib/qof-codes';
-
+import { KPICard } from '@/components/dashboard/KPICard';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area, BarChart, Bar, Legend } from 'recharts';
 
 type GapFilter = 'all' | 'bp' | 'smoking' | 'no-data';
 type PriorityFilter = 'all' | 'high' | 'medium' | 'normal';
-type CategoryTab = 'all' | string;
-type ViewTab = 'indicators' | 'actions';
 
 const getCategoryIcon = (iconName: string) => {
   switch (iconName) {
