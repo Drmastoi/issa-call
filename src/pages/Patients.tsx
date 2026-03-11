@@ -487,7 +487,7 @@ Jane Doe,07700900456,,Afternoon`}
             <div>
               <CardTitle>Patient List</CardTitle>
               <CardDescription>
-                {patients?.length ?? 0} patients in database
+                {selectedIds.size > 0 ? `${selectedIds.size} selected · ` : ''}{totalPatients} patients in database
               </CardDescription>
             </div>
             <Button
